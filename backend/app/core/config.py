@@ -30,11 +30,22 @@ class Settings(BaseSettings):
     REDIS_SESSION_TTL: int = 1800
     
     # AI/LLM Configuration
+    # Provider: "openai", "huggingface", or "auto" (auto uses HuggingFace if no OpenAI key)
+    AI_PROVIDER: str = "auto"
+    
+    # OpenAI Configuration (Optional)
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-4-turbo-preview"
     EMBEDDING_MODEL: str = "text-embedding-3-large"
     AI_TEMPERATURE: float = 0.3
     AI_MAX_TOKENS: int = 2000
+    
+    # Hugging Face Configuration (Local & Production)
+    HUGGINGFACE_MODEL: str = "microsoft/DialoGPT-medium"  # For text generation
+    HUGGINGFACE_EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"  # For embeddings
+    HUGGINGFACE_LLM_MODEL: str = "mistralai/Mistral-7B-Instruct-v0.1"  # For explanations (smaller: "TinyLlama/TinyLlama-1.1B-Chat-v1.0")
+    USE_GPU: bool = False  # Set to True if GPU available
+    MODEL_DEVICE: str = "cpu"  # "cpu" or "cuda"
     
     # Alternative AI Providers
     ANTHROPIC_API_KEY: Optional[str] = None

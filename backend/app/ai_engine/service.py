@@ -25,20 +25,45 @@ except Exception as e:
 
 
 class AIEngine:
-    """AI engine for matching and reasoning"""
+    """AI engine for matching and reasoning - supports OpenAI and Hugging Face"""
     
     def __init__(self):
-        self.openai_client = openai.OpenAI(api_key=settings.OPENAI_API_KEY) if settings.OPENAI_API_KEY else None
+        self.openai_client = openai_client
+        self.huggingface_service = huggingface_service
+        self.provider = self._determine_provider()
+        logger.info("ai_engine_initialized", provider=self.provider)
+    
+    def _determine_provider(self) -> str:
+        """Determine which AI provider to use"""
+        if settings.AI_PROVIDER == "openai" and self.openai_client:
+            return "openai"
+        elif settings.AI_PROVIDER == "huggingface" and self.huggingface_service:
+            return "huggingface"
+        elif settings.AI_PROVIDER == "auto":
+            # Auto: Use HuggingFace if available, else OpenAI
+            if self.huggingface_service:
+                return "huggingface"
+            elif self.openai_client:
+                return "openai"
+        # Fallback
+        if self.huggingface_service:
+            return "huggingface"
+        elif self.openai_client:
+            return "openai"
+        return "fallback"
     
     def generate_embedding(self, text: str) -> List[float]:
-        """Generate embedding for text"""
-        cache_key = get_cache_key("embedding", text[:100])  # Use first 100 chars for cache key
+        """Generate embedding for text - uses HuggingFace (local) or OpenAI"""
+        cache_key = get_cache_key("embedding", self.provider, text[:100])
         cached = get_cache(cache_key)
         if cached:
             return cached
         
         try:
-            if self.openai_client:
+            # Priority: HuggingFace (local, free) > OpenAI (API, paid) > SentenceTransformer (fallback)
+            if self.provider == "huggingface" and self.huggingface_service:
+                embedding = self.huggingface_service.generate_embedding(text)
+            elif self.provider == "openai" and self.openai_client:
                 response = self.openai_client.embeddings.create(
                     model=settings.EMBEDDING_MODEL,
                     input=text,
@@ -47,14 +72,13 @@ class AIEngine:
             elif embedding_model:
                 embedding = embedding_model.encode(text).tolist()
             else:
-                # Fallback: simple hash-based embedding (not semantic)
                 logger.warning("no_embedding_model_available")
                 embedding = self._simple_embedding(text)
             
-            set_cache(cache_key, embedding, ttl=settings.REDIS_CACHE_TTL * 24)  # Cache for 24 hours
+            set_cache(cache_key, embedding, ttl=settings.REDIS_CACHE_TTL * 24)
             return embedding
         except Exception as e:
-            logger.error("embedding_generation_failed", error=str(e))
+            logger.error("embedding_generation_failed", error=str(e), provider=self.provider)
             return self._simple_embedding(text)
     
     def _simple_embedding(self, text: str) -> List[float]:

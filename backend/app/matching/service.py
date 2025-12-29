@@ -150,7 +150,7 @@ class MatchingService:
                 recommendations=explanation_data.get("recommendations", []),
                 confidence_score=explanation_data.get("confidence_score", 0),
                 reasoning_quality=explanation_data.get("reasoning_quality", "medium"),
-                model_used=settings.OPENAI_MODEL if ai_engine.openai_client else "fallback",
+                model_used=settings.HUGGINGFACE_LLM_MODEL if ai_engine.provider == "huggingface" else (settings.OPENAI_MODEL if ai_engine.provider == "openai" else "fallback"),
             )
             db.add(ai_explanation)
         
