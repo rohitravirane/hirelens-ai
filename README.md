@@ -42,6 +42,7 @@ See [Architecture Documentation](./docs/architecture.md) for detailed architectu
 - Docker & Docker Compose
 - Python 3.11+ (for local development)
 - Node.js 18+ (for frontend development)
+- **OpenAI API Key (Optional)** - Only needed if using OpenAI. Hugging Face works locally without API!
 
 ### Using Docker Compose (Recommended)
 
@@ -53,8 +54,10 @@ See [Architecture Documentation](./docs/architecture.md) for detailed architectu
 
 2. **Set up environment variables**
    ```bash
-   cp .env.example .env
-   # Edit .env and add your OpenAI API key
+   # .env file already exists with default settings
+   # Edit .env and configure:
+   # - AI_PROVIDER=auto (uses Hugging Face locally, no API costs!)
+   # - OPENAI_API_KEY (optional, only if you want to use OpenAI)
    ```
 
 3. **Start services**
@@ -206,15 +209,39 @@ Returns candidates sorted by match score with percentile rankings.
 
 ## 🧠 AI Engine
 
-### Models Used
+### AI Providers Supported
 
-- **OpenAI GPT-4**: Explanation generation
-- **OpenAI Embeddings**: Semantic similarity
-- **Sentence Transformers**: Fallback embeddings
+**1. Hugging Face (Recommended - Free & Local)**
+- ✅ **Free** - No API costs
+- ✅ **Local** - Runs on your machine/server
+- ✅ **Private** - Data never leaves your infrastructure
+- ✅ **Works Offline** - No internet required after model download
+- Models: Sentence Transformers (embeddings), TinyLlama/Mistral (text generation)
+
+**2. OpenAI (Optional - Paid API)**
+- Better quality explanations
+- Faster API responses
+- Requires API key and internet
+
+### Configuration
+
+In `.env` file:
+```env
+# Use Hugging Face (Free, Local)
+AI_PROVIDER=auto
+
+# Or explicitly use Hugging Face
+AI_PROVIDER=huggingface
+
+# Or use OpenAI (requires API key)
+AI_PROVIDER=openai
+OPENAI_API_KEY=your-key-here
+```
 
 ### Cost Optimization
 
-- Aggressive caching (24-hour TTL for embeddings)
+- **Hugging Face**: Completely free, runs locally
+- **OpenAI**: Aggressive caching (24-hour TTL for embeddings)
 - Hash-based cache keys
 - Batch processing
 - Fallback models when appropriate
@@ -239,6 +266,9 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
+# Configure .env file in project root
+# Set AI_PROVIDER=auto for Hugging Face (free, local)
+
 # Run migrations
 alembic upgrade head
 
@@ -248,6 +278,8 @@ python scripts/init_db.py
 # Run server
 uvicorn app.main:app --reload
 ```
+
+**Note**: First time running with Hugging Face will download models (~100MB-1GB). This happens automatically.
 
 ### Frontend Development
 
@@ -274,6 +306,40 @@ npm test
 - [Architecture](./docs/architecture.md): System design and architecture
 - [AI Reasoning](./docs/ai_reasoning.md): AI explainability and reasoning
 - [Scaling Strategy](./docs/scaling.md): Scaling from 100 to 1M users
+
+## 🤖 AI Configuration
+
+### Using Hugging Face (Free, Local - Recommended)
+
+```env
+AI_PROVIDER=auto
+# or
+AI_PROVIDER=huggingface
+
+# Models (auto-downloads on first use)
+HUGGINGFACE_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+HUGGINGFACE_LLM_MODEL=TinyLlama/TinyLlama-1.1B-Chat-v1.0
+USE_GPU=false
+MODEL_DEVICE=cpu
+```
+
+**Benefits:**
+- ✅ No API costs
+- ✅ 100% local and private
+- ✅ Works offline
+- ✅ Production ready
+
+### Using OpenAI (Optional - Paid)
+
+```env
+AI_PROVIDER=openai
+OPENAI_API_KEY=your-api-key-here
+```
+
+**Benefits:**
+- ✅ Better quality explanations
+- ✅ Faster API responses
+- ✅ No local model downloads
 
 ## 🔒 Security
 
