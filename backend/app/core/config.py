@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
-    SECRET_KEY: str = Field(..., min_length=32)
+    SECRET_KEY: str = Field(default="change-this-in-production-min-32-characters-required", min_length=32)
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
