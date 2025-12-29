@@ -16,7 +16,11 @@ HireLens AI is not a demo or tutorial project. It's a **real-world, enterprise-g
 - ✅ **Multi-Dimensional Scoring**: Skill match, experience, projects, domain familiarity
 - ✅ **Explainable AI**: Human-readable explanations for every match
 - ✅ **Candidate Ranking**: Percentile-based ranking with confidence levels
-- ✅ **Recruiter Dashboard**: Insight-first UI for hiring decisions
+- ✅ **Recruiter Dashboard**: Interactive UI with tabs, modals, and drag-drop features
+- ✅ **Job Management**: Create and manage job descriptions with AI-powered parsing
+- ✅ **Resume Upload**: Drag-and-drop resume upload with automatic parsing
+- ✅ **Candidate Management**: Add and manage candidates with resume linking
+- ✅ **Interactive Rankings**: View AI-powered candidate rankings with detailed explanations
 
 ## 🏗️ Architecture
 
@@ -103,7 +107,12 @@ hirelens-ai/
 │   └── Dockerfile
 ├── frontend/
 │   ├── app/                # Next.js app directory
+│   │   ├── dashboard/      # Main dashboard with tabs
+│   │   └── login/          # Login page
 │   ├── components/         # React components
+│   │   ├── JobModal.tsx    # Job creation modal
+│   │   ├── ResumeUpload.tsx # Resume upload with drag-drop
+│   │   └── CandidateModal.tsx # Candidate creation form
 │   ├── lib/                # Utilities
 │   ├── hooks/              # React hooks
 │   └── package.json
