@@ -19,38 +19,9 @@ logger = structlog.get_logger()
 
 
 def create_test_users(db: Session):
-    """Create test users"""
-    recruiter_role = db.query(Role).filter(Role.name == "recruiter").first()
-    hiring_manager_role = db.query(Role).filter(Role.name == "hiring_manager").first()
-    
-    users = [
-        {
-            "email": "recruiter@hirelens.ai",
-            "password": "recruiter123",
-            "full_name": "Test Recruiter",
-            "role": recruiter_role,
-        },
-        {
-            "email": "manager@hirelens.ai",
-            "password": "manager123",
-            "full_name": "Test Hiring Manager",
-            "role": hiring_manager_role,
-        },
-    ]
-    
-    for user_data in users:
-        existing = db.query(User).filter(User.email == user_data["email"]).first()
-        if not existing:
-            user = User(
-                email=user_data["email"],
-                hashed_password=get_password_hash(user_data["password"]),
-                full_name=user_data["full_name"],
-                is_active=True,
-                is_verified=True,
-            )
-            user.roles = [user_data["role"]]
-            db.add(user)
-            logger.info("test_user_created", email=user_data["email"])
+    """Create test users - Only rohitravikantrane@gmail.com user"""
+    # No test users - only admin user (rohitravikantrane@gmail.com) exists
+    pass
 
 
 def create_test_job(db: Session):
@@ -109,7 +80,7 @@ def main():
     """Main function"""
     db: Session = SessionLocal()
     try:
-        create_test_users(db)
+        # Only create test job - user is rohitravikantrane@gmail.com
         create_test_job(db)
         db.commit()
         logger.info("test_data_created")
