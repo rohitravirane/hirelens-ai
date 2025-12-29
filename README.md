@@ -79,6 +79,20 @@ See [Architecture Documentation](./docs/architecture.md) for detailed architectu
    - API Docs: http://localhost:8000/api/docs
    - Backend API: http://localhost:8000
 
+### Dashboard Features
+
+The recruiter dashboard includes:
+
+- **Jobs Tab**: View all jobs, create new jobs with AI-powered parsing
+- **Candidates Tab**: Upload resumes (drag & drop), add candidates, view candidate list
+- **Rankings Tab**: View AI-powered candidate rankings for selected jobs
+- **Interactive Modals**: 
+  - Job creation form with full job description parsing
+  - Resume upload with drag-and-drop support
+  - Candidate creation form with resume linking
+- **Match All**: Bulk match all candidates to a job with one click
+- **AI Explanations**: View detailed AI analysis with strengths, weaknesses, and recommendations
+
 ### Default Credentials
 
 - **Email**: rohitravikantrane@gmail.com
