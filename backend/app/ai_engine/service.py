@@ -28,8 +28,25 @@ class AIEngine:
     """AI engine for matching and reasoning - supports OpenAI and Hugging Face"""
     
     def __init__(self):
-        self.openai_client = openai_client
-        self.huggingface_service = huggingface_service
+        # Initialize OpenAI client if API key is available
+        self.openai_client = None
+        if settings.OPENAI_API_KEY and (settings.AI_PROVIDER == "openai" or settings.AI_PROVIDER == "auto"):
+            try:
+                self.openai_client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+                logger.info("openai_client_initialized")
+            except Exception as e:
+                logger.warning("openai_client_init_failed", error=str(e))
+        
+        # Initialize Hugging Face service (always available as fallback)
+        self.huggingface_service = None
+        if settings.AI_PROVIDER == "huggingface" or settings.AI_PROVIDER == "auto" or not self.openai_client:
+            try:
+                # Use the embedding model that's already initialized
+                self.huggingface_service = {"embedding_model": embedding_model}
+                logger.info("huggingface_service_initialized")
+            except Exception as e:
+                logger.warning("huggingface_service_init_failed", error=str(e))
+        
         self.provider = self._determine_provider()
         logger.info("ai_engine_initialized", provider=self.provider)
     
@@ -61,8 +78,8 @@ class AIEngine:
         
         try:
             # Priority: HuggingFace (local, free) > OpenAI (API, paid) > SentenceTransformer (fallback)
-            if self.provider == "huggingface" and self.huggingface_service:
-                embedding = self.huggingface_service.generate_embedding(text)
+            if self.provider == "huggingface" and self.huggingface_service and self.huggingface_service.get("embedding_model"):
+                embedding = self.huggingface_service["embedding_model"].encode(text).tolist()
             elif self.provider == "openai" and self.openai_client:
                 response = self.openai_client.embeddings.create(
                     model=settings.EMBEDDING_MODEL,

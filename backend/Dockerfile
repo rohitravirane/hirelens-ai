@@ -12,8 +12,8 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download spaCy language model
-RUN python -m spacy download en_core_web_sm
+# Download spaCy language model (optional, can fail gracefully)
+RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed, will use fallback"
 
 # Copy application code
 COPY . .

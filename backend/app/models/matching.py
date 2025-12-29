@@ -1,7 +1,7 @@
 """
 Matching and scoring models
 """
-from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKey, JSON, Boolean, Index
+from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKey, JSON, Boolean, Index, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
