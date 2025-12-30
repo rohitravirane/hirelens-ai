@@ -51,6 +51,7 @@ See [Architecture Documentation](./docs/architecture.md) for detailed architectu
 - Docker & Docker Compose
 - Python 3.11+ (for local development)
 - Node.js 18+ (for frontend development)
+- **NVIDIA GPU (Optional but Recommended)** - For faster AI model inference. CUDA-enabled GPU with Docker GPU support.
 - **OpenAI API Key (Optional)** - Only needed if using OpenAI. Hugging Face works locally without API!
 
 ### Using Docker Compose (Recommended)
@@ -406,7 +407,8 @@ AI_PROVIDER=huggingface
 
 # Models (auto-downloads on first use)
 HUGGINGFACE_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-HUGGINGFACE_LLM_MODEL=TinyLlama/TinyLlama-1.1B-Chat-v1.0
+HUGGINGFACE_LLM_MODEL=mistralai/Mistral-7B-Instruct-v0.1
+HUGGINGFACE_PARSER_MODEL=mistralai/Mistral-7B-Instruct-v0.1
 USE_GPU=false
 MODEL_DEVICE=cpu
 ```
@@ -416,6 +418,49 @@ MODEL_DEVICE=cpu
 - ✅ 100% local and private
 - ✅ Works offline
 - ✅ Production ready
+
+### GPU/CUDA Support (Recommended for Better Performance)
+
+If you have an NVIDIA GPU, enable GPU support for faster model inference:
+
+**Prerequisites:**
+- NVIDIA GPU with CUDA support
+- Docker Desktop with GPU support enabled (Windows) or nvidia-docker (Linux)
+- NVIDIA drivers installed
+
+**Enable GPU:**
+
+1. **Verify GPU is accessible in Docker:**
+   ```bash
+   docker run --rm --gpus all nvidia/cuda:12.0.0-base-ubuntu22.04 nvidia-smi
+   ```
+
+2. **Update `.env` file:**
+   ```env
+   USE_GPU=true
+   MODEL_DEVICE=cuda
+   HUGGINGFACE_PARSER_MODEL=mistralai/Mistral-7B-Instruct-v0.1
+   USE_QUANTIZATION=true  # Reduces memory usage by 50%
+   ```
+
+3. **Rebuild and restart containers:**
+   ```bash
+   docker-compose build backend
+   docker-compose up -d
+   ```
+
+**GPU Benefits:**
+- 🚀 **5-10x faster** resume parsing with Mistral-7B
+- ⚡ Faster model inference
+- 💾 8-bit quantization reduces memory usage
+- 🎯 Better quality with larger models (Mistral-7B vs TinyLlama)
+
+**Model Download:**
+- Mistral-7B model (~13-14 GB) will **auto-download** on first resume upload
+- Download happens automatically - no manual steps needed
+- Models are cached in `/root/.cache/huggingface/hub/` inside container
+
+**Note:** Without GPU, the system will use CPU which is slower but still functional.
 
 ### Using OpenAI (Optional - Paid)
 
