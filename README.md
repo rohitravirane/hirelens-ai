@@ -89,12 +89,23 @@ See [Architecture Documentation](./docs/architecture.md) for detailed architectu
 The recruiter dashboard includes:
 
 - **Jobs Tab**: View all jobs (30+ pre-loaded tech jobs), create new jobs with AI-powered parsing
-- **Candidates Tab**: Upload resumes (drag & drop), add candidates, view candidate list
+- **Candidates Tab**: Upload resumes (drag & drop), add candidates, view candidate list with quality indicators
 - **Rankings Tab**: View AI-powered candidate rankings for selected jobs
 - **Interactive Modals**: 
   - Job creation form with full job description parsing
+  - Job details modal with sticky header showing full job description
   - Resume upload with drag-and-drop support
   - Candidate creation form with resume linking
+  - Candidate details modal with quality score and reprocessing
+- **Quality Indicators**: 
+  - Visual quality score (0-100%) in candidate list
+  - Color-coded progress bars (Green/Yellow/Red)
+  - Quality score display in candidate details modal
+  - Reprocess button for low-quality resumes (<80%)
+- **Smart Matching**: 
+  - Match button disabled if resume quality < 80%
+  - Error notifications for quality requirements
+  - Prevents matching with incomplete data
 - **Match All**: Bulk match all candidates to a job with one click
 - **Real-time Notifications**: Success/error notifications for match operations
 - **AI Explanations**: View detailed AI analysis with strengths, weaknesses, and recommendations
@@ -102,6 +113,7 @@ The recruiter dashboard includes:
   - Black text in all form inputs for better readability
   - Immediate logout redirect to login page
   - Loading states and visual feedback
+  - Fully responsive design (mobile, tablet, desktop)
 
 ### Default Credentials
 
@@ -539,9 +551,10 @@ Built with:
 ### Latest Features (v1.2)
 - ✨ **World-Class Resume Parsing**: Enhanced AI prompts for comprehensive data extraction
 - ✨ **Quality Scoring System**: Automatic quality score (0-100) for each parsed resume
-- ✨ **Quality Indicators**: Visual indicators in UI showing data extraction confidence
-- ✨ **Reprocessing**: One-click reprocessing to improve extraction quality
-- ✨ **Smart Blocking**: Prevents matching if resume quality is too low (<80%)
+- ✨ **Quality Indicators in UI**: Visual quality score with progress bars in candidate list
+- ✨ **Reprocessing in UI**: One-click reprocessing button in candidate details modal
+- ✨ **Smart Blocking**: Prevents matching if resume quality is too low (<80%) with error notifications
+- ✨ **Job & Candidate Details Modals**: Full details view with sticky headers
 - ✨ 30+ pre-loaded tech jobs with comprehensive descriptions
 - ✨ Improved UI/UX with better form styling and logout redirect
 - ✨ Real-time notifications for match operations
