@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import api from '@/lib/api'
+import { useQueryClient } from 'react-query'
 
 interface CandidateDetailsModalProps {
   isOpen: boolean
@@ -13,7 +14,10 @@ export default function CandidateDetailsModal({ isOpen, onClose, candidateId }: 
   const [candidate, setCandidate] = useState<any>(null)
   const [resume, setResume] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [reprocessing, setReprocessing] = useState(false)
   const [error, setError] = useState('')
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     if (isOpen && candidateId) {
@@ -48,10 +52,69 @@ export default function CandidateDetailsModal({ isOpen, onClose, candidateId }: 
     }
   }
 
+  const handleReprocess = async () => {
+    if (!candidate?.resume_id) return
+    
+    setReprocessing(true)
+    setError('')
+    try {
+      await api.post(`/api/v1/resumes/${candidate.resume_id}/reprocess`)
+      setNotification({ 
+        type: 'success', 
+        message: 'Resume queued for reprocessing. Quality score will update in a few minutes.' 
+      })
+      // Refresh candidate data after a delay
+      setTimeout(() => {
+        fetchCandidateDetails()
+        queryClient.invalidateQueries('candidates')
+      }, 2000)
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to reprocess resume')
+    } finally {
+      setReprocessing(false)
+    }
+  }
+
   if (!isOpen || !candidateId) return null
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      {/* Notification Toast */}
+      {notification && (
+        <div className="fixed top-4 right-4 left-4 sm:left-auto z-[60] animate-slide-in">
+          <div className={`rounded-lg shadow-lg p-4 max-w-md mx-auto sm:mx-0 ${
+            notification.type === 'success' 
+              ? 'bg-green-50 border border-green-200' 
+              : 'bg-red-50 border border-red-200'
+          }`}>
+            <div className="flex items-center">
+              {notification.type === 'success' ? (
+                <svg className="w-5 h-5 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              )}
+              <p className={`text-sm font-medium ${
+                notification.type === 'success' ? 'text-green-800' : 'text-red-800'
+              }`}>
+                {notification.message}
+              </p>
+              <button
+                onClick={() => setNotification(null)}
+                className="ml-4 text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -111,8 +174,71 @@ export default function CandidateDetailsModal({ isOpen, onClose, candidateId }: 
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto px-6">
+              {/* Quality Score Indicator */}
+              {candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && (
+                <div className="mb-6 pt-4">
+                  <div className="bg-gray-50 rounded-lg p-4 border-2 border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold text-gray-900">Resume Quality Score</h3>
+                      <span className={`text-lg font-bold ${
+                        candidate.resume_quality_score >= 80 ? 'text-green-600' :
+                        candidate.resume_quality_score >= 50 ? 'text-yellow-600' :
+                        'text-red-600'
+                      }`}>
+                        {candidate.resume_quality_score}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3 mb-3">
+                      <div 
+                        className={`h-3 rounded-full transition-all ${
+                          candidate.resume_quality_score >= 80 ? 'bg-green-500' :
+                          candidate.resume_quality_score >= 50 ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`}
+                        style={{ width: `${candidate.resume_quality_score}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <p className={`text-xs ${
+                        candidate.resume_quality_score >= 80 ? 'text-green-700' :
+                        candidate.resume_quality_score >= 50 ? 'text-yellow-700' :
+                        'text-red-700'
+                      }`}>
+                        {candidate.resume_quality_score >= 80 ? '✅ Excellent - Ready for matching' :
+                         candidate.resume_quality_score >= 50 ? '⚠️ Moderate - Reprocessing recommended' :
+                         '❌ Poor - Reprocessing required'}
+                      </p>
+                      {candidate.resume_quality_score < 80 && candidate.resume_id && (
+                        <button
+                          onClick={handleReprocess}
+                          disabled={reprocessing}
+                          className="px-3 py-1 text-xs font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                        >
+                          {reprocessing ? (
+                            <>
+                              <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647A7.962 7.962 0 0112 20c4.418 0 8-3.582 8-8h-4a4 4 0 11-8 0v4z"></path>
+                              </svg>
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              Reprocess
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {/* Contact Information */}
-              <div className="mb-6 pt-4">
+              <div className="mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Contact Information</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {candidate.email && (

@@ -124,27 +124,27 @@ def get_resume(
         .first()
     )
     
-        return ResumeDetailResponse(
-            id=resume.id,
-            file_name=resume.file_name,
-            file_size=resume.file_size,
-            file_type=resume.file_type,
-            processing_status=resume.processing_status,
-            raw_text=resume.raw_text,
-            created_at=resume.created_at,
-            latest_version=ResumeVersionResponse(
-                id=latest_version.id,
-                resume_id=latest_version.resume_id,
-                version_number=latest_version.version_number,
-                skills=latest_version.skills,
-                experience_years=latest_version.experience_years,
-                education=latest_version.education,
-                experience=latest_version.experience,
-                projects=latest_version.projects,
-                parsed_at=latest_version.parsed_at,
-                quality_score=latest_version.quality_score,
-            ) if latest_version else None,
-        )
+    return ResumeDetailResponse(
+        id=resume.id,
+        file_name=resume.file_name,
+        file_size=resume.file_size,
+        file_type=resume.file_type,
+        processing_status=resume.processing_status,
+        raw_text=resume.raw_text,
+        created_at=resume.created_at,
+        latest_version=ResumeVersionResponse(
+            id=latest_version.id,
+            resume_id=latest_version.resume_id,
+            version_number=latest_version.version_number,
+            skills=latest_version.skills,
+            experience_years=latest_version.experience_years,
+            education=latest_version.education,
+            experience=latest_version.experience,
+            projects=latest_version.projects,
+            parsed_at=latest_version.parsed_at,
+            quality_score=latest_version.quality_score,
+        ) if latest_version else None,
+    )
 
 
 @router.post("/{resume_id}/reprocess", response_model=ResumeResponse)

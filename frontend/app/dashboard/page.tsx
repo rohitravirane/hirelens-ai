@@ -366,6 +366,9 @@ export default function DashboardPage() {
                           Email
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quality
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Status
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -383,6 +386,31 @@ export default function DashboardPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-500">{candidate.email}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined ? (
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-gray-200 rounded-full h-2 w-16">
+                                  <div 
+                                    className={`h-2 rounded-full ${
+                                      candidate.resume_quality_score >= 80 ? 'bg-green-500' :
+                                      candidate.resume_quality_score >= 50 ? 'bg-yellow-500' :
+                                      'bg-red-500'
+                                    }`}
+                                    style={{ width: `${candidate.resume_quality_score}%` }}
+                                  ></div>
+                                </div>
+                                <span className={`text-xs font-semibold ${
+                                  candidate.resume_quality_score >= 80 ? 'text-green-700' :
+                                  candidate.resume_quality_score >= 50 ? 'text-yellow-700' :
+                                  'text-red-700'
+                                }`}>
+                                  {candidate.resume_quality_score}%
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-400">N/A</span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -410,13 +438,27 @@ export default function DashboardPage() {
                             </button>
                             {selectedJobId && (
                               <button
-                                onClick={() => matchMutation.mutate({ candidateId: candidate.id, jobId: selectedJobId })}
-                                disabled={matchMutation.isLoading || matchingCandidateId === candidate.id}
+                                onClick={() => {
+                                  // Block matching if quality is too low
+                                  if (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80) {
+                                    setNotification({
+                                      type: 'error',
+                                      message: `Cannot match: Resume quality is ${candidate.resume_quality_score}%. Please reprocess resume to improve quality (minimum 80% required).`
+                                    })
+                                    setTimeout(() => setNotification(null), 5000)
+                                    return
+                                  }
+                                  matchMutation.mutate({ candidateId: candidate.id, jobId: selectedJobId })
+                                }}
+                                disabled={matchMutation.isLoading || matchingCandidateId === candidate.id || (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80)}
                                 className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
                                   matchMutation.isLoading && matchingCandidateId === candidate.id
                                     ? 'bg-primary-100 text-primary-700 cursor-wait'
+                                    : (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80)
+                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                     : 'bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed'
                                 }`}
+                                title={candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80 ? 'Resume quality too low. Reprocess required.' : ''}
                               >
                                 {matchMutation.isLoading && matchingCandidateId === candidate.id ? (
                                   <span className="flex items-center">
@@ -443,11 +485,32 @@ export default function DashboardPage() {
                   {candidates.map((candidate: any) => (
                     <div key={candidate.id} className="bg-white rounded-lg shadow p-4">
                       <div className="flex justify-between items-start mb-3">
-                        <div>
+                        <div className="flex-1">
                           <h3 className="text-sm font-semibold text-gray-900">
                             {candidate.first_name} {candidate.last_name}
                           </h3>
                           <p className="text-xs text-gray-500 mt-1">{candidate.email}</p>
+                          {candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                                <div 
+                                  className={`h-1.5 rounded-full ${
+                                    candidate.resume_quality_score >= 80 ? 'bg-green-500' :
+                                    candidate.resume_quality_score >= 50 ? 'bg-yellow-500' :
+                                    'bg-red-500'
+                                  }`}
+                                  style={{ width: `${candidate.resume_quality_score}%` }}
+                                ></div>
+                              </div>
+                              <span className={`text-xs font-semibold ${
+                                candidate.resume_quality_score >= 80 ? 'text-green-700' :
+                                candidate.resume_quality_score >= 50 ? 'text-yellow-700' :
+                                'text-red-700'
+                              }`}>
+                                {candidate.resume_quality_score}%
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
                           candidate.status === 'active' ? 'bg-green-100 text-green-800' :
@@ -474,13 +537,27 @@ export default function DashboardPage() {
                         </button>
                         {selectedJobId && (
                           <button
-                            onClick={() => matchMutation.mutate({ candidateId: candidate.id, jobId: selectedJobId })}
-                            disabled={matchMutation.isLoading || matchingCandidateId === candidate.id}
+                            onClick={() => {
+                              // Block matching if quality is too low
+                              if (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80) {
+                                setNotification({
+                                  type: 'error',
+                                  message: `Cannot match: Resume quality is ${candidate.resume_quality_score}%. Please reprocess resume to improve quality (minimum 80% required).`
+                                })
+                                setTimeout(() => setNotification(null), 5000)
+                                return
+                              }
+                              matchMutation.mutate({ candidateId: candidate.id, jobId: selectedJobId })
+                            }}
+                            disabled={matchMutation.isLoading || matchingCandidateId === candidate.id || (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80)}
                             className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                               matchMutation.isLoading && matchingCandidateId === candidate.id
                                 ? 'bg-primary-100 text-primary-700 cursor-wait'
+                                : (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80)
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                 : 'bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed'
                             }`}
+                            title={candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80 ? 'Resume quality too low. Reprocess required.' : ''}
                           >
                             {matchMutation.isLoading && matchingCandidateId === candidate.id ? (
                               <span className="flex items-center justify-center">
