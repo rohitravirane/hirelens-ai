@@ -194,14 +194,19 @@ Upload resumes (PDF/DOCX) and extract using advanced AI:
 - **Languages**: Programming and spoken languages
 
 **Advanced Features:**
-- **World-Class AI Parsing**: Enhanced LLM prompts for intelligent extraction from any resume format
+- **World-Class AI Parsing**: 
+  - **Mistral-7B Model** (default): Best quality resume extraction, production-ready
+  - Enhanced LLM prompts for intelligent extraction from any resume format
+  - Local models - no API keys required, auto-downloads on first use
+  - 8-bit quantization for memory efficiency (50% reduction)
+  - Automatic fallbacks: Mistral → Phi-2 → TinyLlama → Rule-based
 - **Quality Scoring System**: Automatic quality score (0-100) for each parsed resume
   - Scores based on: Skills extraction, Experience calculation, Education, Projects, Data completeness
   - Quality indicators in UI show data extraction confidence
   - Reprocessing available for low-quality extractions
 - **Intelligent Date Parsing**: Handles multiple date formats (YYYY-MM, YYYY, "Present", etc.)
 - **Automatic Experience Calculation**: Handles overlapping job periods correctly
-- **Fallback System**: Rule-based parser if AI parsing fails
+- **Production Optimizations**: Memory management, GPU support, model caching
 - **Reprocessing**: One-click reprocessing to improve extraction quality
 
 **API Example:**
@@ -273,7 +278,7 @@ Returns candidates sorted by match score with percentile rankings.
 
 ### AI Providers Supported
 
-**1. Hugging Face (Recommended - Free & Local)**
+**1. Hugging Face (Recommended - Free & Local, Production-Ready)**
 - ✅ **Free** - No API costs
 - ✅ **Local** - Runs on your machine/server
 - ✅ **Private** - Data never leaves your infrastructure

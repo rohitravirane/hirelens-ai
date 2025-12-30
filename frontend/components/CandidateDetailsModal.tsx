@@ -61,17 +61,52 @@ export default function CandidateDetailsModal({ isOpen, onClose, candidateId }: 
       await api.post(`/api/v1/resumes/${candidate.resume_id}/reprocess`)
       setNotification({ 
         type: 'success', 
-        message: 'Resume queued for reprocessing. Quality score will update in a few minutes.' 
+        message: 'Resume queued for reprocessing. Status will update automatically...' 
       })
-      // Refresh candidate data after a delay
+      
+      // Poll for status updates
+      const pollInterval = setInterval(async () => {
+        try {
+          const resumeResponse = await api.get(`/api/v1/resumes/${candidate.resume_id}`)
+          const resume = resumeResponse.data
+          
+          if (resume.processing_status === 'completed') {
+            clearInterval(pollInterval)
+            setReprocessing(false)
+            setNotification({ 
+              type: 'success', 
+              message: 'Resume reprocessing completed! Quality score updated.' 
+            })
+            fetchCandidateDetails()
+            queryClient.invalidateQueries('candidates')
+            setTimeout(() => setNotification(null), 3000)
+          } else if (resume.processing_status === 'failed') {
+            clearInterval(pollInterval)
+            setReprocessing(false)
+            setError('Reprocessing failed. Please try again.')
+            setNotification(null)
+          }
+        } catch (err) {
+          // Continue polling
+        }
+      }, 2000) // Poll every 2 seconds
+      
+      // Stop polling after 5 minutes
       setTimeout(() => {
-        fetchCandidateDetails()
-        queryClient.invalidateQueries('candidates')
-      }, 2000)
+        clearInterval(pollInterval)
+        if (reprocessing) {
+          setReprocessing(false)
+          setNotification({ 
+            type: 'success', 
+            message: 'Reprocessing in progress. Quality score will update shortly.' 
+          })
+          setTimeout(() => setNotification(null), 5000)
+        }
+      }, 300000) // 5 minutes
+      
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to reprocess resume')
-    } finally {
       setReprocessing(false)
+      setError(err.response?.data?.detail || 'Failed to reprocess resume')
     }
   }
 
@@ -209,28 +244,39 @@ export default function CandidateDetailsModal({ isOpen, onClose, candidateId }: 
                          '❌ Poor - Reprocessing required'}
                       </p>
                       {candidate.resume_quality_score < 80 && candidate.resume_id && (
-                        <button
-                          onClick={handleReprocess}
-                          disabled={reprocessing}
-                          className="px-3 py-1 text-xs font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                        >
-                          {reprocessing ? (
-                            <>
+                        <div className="flex items-center gap-2">
+                          {reprocessing && (
+                            <div className="flex items-center gap-2 text-xs text-blue-600">
                               <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647A7.962 7.962 0 0112 20c4.418 0 8-3.582 8-8h-4a4 4 0 11-8 0v4z"></path>
                               </svg>
-                              Processing...
-                            </>
-                          ) : (
-                            <>
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                              </svg>
-                              Reprocess
-                            </>
+                              <span>Reprocessing...</span>
+                            </div>
                           )}
-                        </button>
+                          <button
+                            onClick={handleReprocess}
+                            disabled={reprocessing}
+                            className="px-3 py-1 text-xs font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                          >
+                            {reprocessing ? (
+                              <>
+                                <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647A7.962 7.962 0 0112 20c4.418 0 8-3.582 8-8h-4a4 4 0 11-8 0v4z"></path>
+                                </svg>
+                                Processing...
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Reprocess
+                              </>
+                            )}
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>

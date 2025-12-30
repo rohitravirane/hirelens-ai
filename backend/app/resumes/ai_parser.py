@@ -45,6 +45,12 @@ class AIParser:
             # Post-process: Calculate experience years from date ranges
             parsed_data["experience_years"] = self._calculate_experience_years(parsed_data.get("experience", []))
             
+            # Calculate quality score if not already calculated
+            if "quality_score" not in parsed_data or parsed_data.get("quality_score") is None:
+                quality_score = self._calculate_quality_score(parsed_data, raw_text)
+                parsed_data["quality_score"] = quality_score
+                logger.info("quality_score_calculated", score=quality_score)
+            
             # Cache the result
             set_cache(cache_key, parsed_data, ttl=3600 * 24)  # Cache for 24 hours
             
@@ -53,7 +59,13 @@ class AIParser:
         except Exception as e:
             logger.error("ai_parsing_failed", error=str(e))
             # Fallback to rule-based parsing
-            return self._parse_with_rules(raw_text)
+            parsed_data = self._parse_with_rules(raw_text)
+            # Calculate quality score for fallback parsing too
+            parsed_data["experience_years"] = self._calculate_experience_years(parsed_data.get("experience", []))
+            quality_score = self._calculate_quality_score(parsed_data, raw_text)
+            parsed_data["quality_score"] = quality_score
+            logger.info("fallback_quality_score_calculated", score=quality_score)
+            return parsed_data
     
     def _parse_with_openai(self, text: str) -> Dict[str, Any]:
         """Parse resume using OpenAI GPT with world-class extraction"""
@@ -168,9 +180,23 @@ IMPORTANT:
             return self._parse_with_rules(text)
     
     def _parse_with_huggingface(self, text: str) -> Dict[str, Any]:
-        """Parse resume using HuggingFace models (fallback)"""
-        # For now, use rule-based with better heuristics
-        # In future, can use fine-tuned models
+        """
+        Parse resume using HuggingFace models for world-class extraction
+        Uses advanced document understanding models from Hugging Face Hub
+        """
+        try:
+            # Try using specialized Hugging Face PDF parser
+            from app.resumes.hf_pdf_parser import hf_pdf_parser
+            parsed_data = hf_pdf_parser.parse_resume(text)
+            if parsed_data:
+                logger.info("hf_pdf_parser_success")
+                return parsed_data
+        except ImportError:
+            logger.warning("hf_pdf_parser_not_available")
+        except Exception as e:
+            logger.warning("huggingface_parsing_failed", error=str(e))
+        
+        # Fallback to rule-based
         return self._parse_with_rules(text)
     
     def _parse_with_rules(self, text: str) -> Dict[str, Any]:

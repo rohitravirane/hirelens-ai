@@ -51,6 +51,12 @@ def process_resume_task(self: Task, resume_id: int):
             try:
                 parsed_data = parser.parse(raw_text)
                 logger.info("fallback_parsing_success", resume_id=resume_id)
+                # Calculate quality score for fallback parsing
+                if "quality_score" not in parsed_data or parsed_data.get("quality_score") is None:
+                    from app.resumes.ai_parser import ai_parser as ai_parser_instance
+                    quality_score = ai_parser_instance._calculate_quality_score(parsed_data, raw_text)
+                    parsed_data["quality_score"] = quality_score
+                    logger.info("fallback_quality_score_calculated", resume_id=resume_id, score=quality_score)
             except Exception as e2:
                 logger.error("resume_parsing_failed", resume_id=resume_id, error=str(e2))
                 resume.processing_status = "failed"
@@ -73,12 +79,17 @@ def process_resume_task(self: Task, resume_id: int):
         )
         version_number = (latest_version.version_number + 1) if latest_version else 1
         
-        # Calculate quality score if not already calculated
+        # Get quality score from parsed data (should be calculated by parser)
         quality_score = parsed_data.get("quality_score")
+        logger.info("quality_score_from_parsed_data", resume_id=resume_id, quality_score=quality_score)
         if quality_score is None:
-            # Calculate quality score
+            # Fallback: Calculate quality score if parser didn't provide it
+            logger.warning("quality_score_missing_from_parser", resume_id=resume_id)
             from app.resumes.ai_parser import ai_parser
             quality_score = ai_parser._calculate_quality_score(parsed_data, raw_text)
+            logger.info("quality_score_calculated_in_task", resume_id=resume_id, score=quality_score)
+        
+        logger.info("final_quality_score", resume_id=resume_id, quality_score=quality_score, version=version_number)
         
         resume_version = ResumeVersion(
             resume_id=resume_id,

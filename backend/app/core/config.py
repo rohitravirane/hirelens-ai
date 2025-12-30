@@ -1,7 +1,7 @@
 """
 Application configuration using Pydantic Settings
 """
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic_settings import BaseSettings
 from pydantic import Field
 
@@ -40,12 +40,19 @@ class Settings(BaseSettings):
     AI_TEMPERATURE: float = 0.3
     AI_MAX_TOKENS: int = 2000
     
-    # Hugging Face Configuration (Local & Production)
+    # Hugging Face Configuration (Local Models - No API Keys Needed)
     HUGGINGFACE_MODEL: str = "microsoft/DialoGPT-medium"  # For text generation
     HUGGINGFACE_EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"  # For embeddings
     HUGGINGFACE_LLM_MODEL: str = "mistralai/Mistral-7B-Instruct-v0.1"  # For explanations (smaller: "TinyLlama/TinyLlama-1.1B-Chat-v1.0")
-    USE_GPU: bool = False  # Set to True if GPU available
+    # Resume Parser Models (auto-downloaded, no API keys needed)
+    # Best Quality: "mistralai/Mistral-7B-Instruct-v0.1" (default, production-ready with quantization)
+    # Fast: "TinyLlama/TinyLlama-1.1B-Chat-v1.0" (CPU), "microsoft/phi-2" (GPU/CPU)
+    HUGGINGFACE_PARSER_MODEL: str = "mistralai/Mistral-7B-Instruct-v0.1"  # Best quality for production
+    USE_GPU: bool = False  # Set to True if GPU available (recommended for Mistral)
     MODEL_DEVICE: str = "cpu"  # "cpu" or "cuda"
+    # Production optimizations
+    USE_QUANTIZATION: bool = True  # Use 8-bit quantization to reduce memory (recommended for production)
+    MODEL_MAX_MEMORY: Optional[Dict[str, str]] = None  # Memory limits per device, e.g. {"0": "10GiB", "cpu": "20GiB"}
     
     # Alternative AI Providers
     ANTHROPIC_API_KEY: Optional[str] = None
