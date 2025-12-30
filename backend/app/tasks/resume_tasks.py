@@ -7,6 +7,7 @@ from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.models.resume import Resume, ResumeVersion
 from app.resumes.parser import ResumeParser
+from app.resumes.ai_parser import ai_parser
 import structlog
 
 logger = structlog.get_logger()
@@ -38,15 +39,24 @@ def process_resume_task(self: Task, resume_id: int):
             db.commit()
             return
         
-        # Parse resume
+        # Parse resume using AI (intelligent extraction - heart of the system)
         try:
-            parsed_data = parser.parse(raw_text)
+            # Try AI parsing first (intelligent extraction)
+            logger.info("starting_ai_resume_parsing", resume_id=resume_id)
+            parsed_data = ai_parser.parse_with_ai(raw_text)
+            logger.info("ai_resume_parsing_complete", resume_id=resume_id)
         except Exception as e:
-            logger.error("resume_parsing_failed", resume_id=resume_id, error=str(e))
-            resume.processing_status = "failed"
-            resume.processing_error = str(e)
-            db.commit()
-            return
+            logger.warning("ai_parsing_failed_fallback", resume_id=resume_id, error=str(e))
+            # Fallback to rule-based parsing
+            try:
+                parsed_data = parser.parse(raw_text)
+                logger.info("fallback_parsing_success", resume_id=resume_id)
+            except Exception as e2:
+                logger.error("resume_parsing_failed", resume_id=resume_id, error=str(e2))
+                resume.processing_status = "failed"
+                resume.processing_error = str(e2)
+                db.commit()
+                return
         
         # Mark old versions as not current
         db.query(ResumeVersion).filter(
@@ -75,7 +85,7 @@ def process_resume_task(self: Task, resume_id: int):
             certifications=parsed_data.get("certifications"),
             languages=parsed_data.get("languages"),
             is_current=True,
-            parser_version="1.0",
+            parser_version="2.0-ai",  # Updated version for AI parsing
         )
         db.add(resume_version)
         

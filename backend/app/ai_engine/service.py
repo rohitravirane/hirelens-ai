@@ -3,7 +3,6 @@ AI engine service for semantic matching and explainability
 """
 from typing import Dict, List, Any, Optional
 import openai
-from sentence_transformers import SentenceTransformer
 import structlog
 import numpy as np
 
@@ -12,16 +11,28 @@ from app.core.redis_client import get_cache, set_cache, get_cache_key
 
 logger = structlog.get_logger()
 
+# Lazy import for sentence_transformers (to avoid blocking celery workers)
+SentenceTransformer = None
+embedding_model = None
+
+def _lazy_import_sentence_transformer():
+    """Lazy import sentence_transformers to avoid blocking startup"""
+    global SentenceTransformer, embedding_model
+    if SentenceTransformer is None:
+        try:
+            from sentence_transformers import SentenceTransformer as ST
+            SentenceTransformer = ST
+            embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+            logger.info("sentence_transformer_initialized")
+        except Exception as e:
+            logger.warning("sentence_transformer_init_failed", error=str(e))
+            SentenceTransformer = None
+            embedding_model = None
+    return SentenceTransformer, embedding_model
+
 # Initialize OpenAI client
 if settings.OPENAI_API_KEY:
     openai.api_key = settings.OPENAI_API_KEY
-
-# Initialize sentence transformer for embeddings (fallback)
-embedding_model = None
-try:
-    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-except Exception as e:
-    logger.warning("sentence_transformer_init_failed", error=str(e))
 
 
 class AIEngine:
@@ -41,9 +52,11 @@ class AIEngine:
         self.huggingface_service = None
         if settings.AI_PROVIDER == "huggingface" or settings.AI_PROVIDER == "auto" or not self.openai_client:
             try:
-                # Use the embedding model that's already initialized
-                self.huggingface_service = {"embedding_model": embedding_model}
-                logger.info("huggingface_service_initialized")
+                # Lazy load sentence transformer
+                _, model = _lazy_import_sentence_transformer()
+                if model:
+                    self.huggingface_service = {"embedding_model": model}
+                    logger.info("huggingface_service_initialized")
             except Exception as e:
                 logger.warning("huggingface_service_init_failed", error=str(e))
         
@@ -86,11 +99,14 @@ class AIEngine:
                     input=text,
                 )
                 embedding = response.data[0].embedding
-            elif embedding_model:
-                embedding = embedding_model.encode(text).tolist()
             else:
-                logger.warning("no_embedding_model_available")
-                embedding = self._simple_embedding(text)
+                # Try to lazy load embedding model
+                _, model = _lazy_import_sentence_transformer()
+                if model:
+                    embedding = model.encode(text).tolist()
+                else:
+                    logger.warning("no_embedding_model_available")
+                    embedding = self._simple_embedding(text)
             
             set_cache(cache_key, embedding, ttl=settings.REDIS_CACHE_TTL * 24)
             return embedding
@@ -296,7 +312,9 @@ Format as JSON with keys: summary, strengths (array), weaknesses (array), recomm
         if missing_required:
             weaknesses.append(f"Missing required skills: {', '.join(list(missing_required)[:3])}")
         
-        experience_diff = candidate_data.get("experience_years", 0) - job_data.get("experience_years_required", 0)
+        candidate_exp = candidate_data.get("experience_years") or 0
+        job_exp_required = job_data.get("experience_years_required") or 0
+        experience_diff = candidate_exp - job_exp_required
         if experience_diff < 0:
             weaknesses.append(f"Has {abs(experience_diff)} fewer years of experience than required")
         elif experience_diff > 0:

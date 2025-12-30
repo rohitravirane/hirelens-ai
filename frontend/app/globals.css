@@ -32,3 +32,37 @@ body {
   }
 }
 
+/* Ensure all form inputs have black text */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="url"],
+input[type="number"],
+input[type="search"],
+textarea,
+select {
+  color: rgb(17, 24, 39) !important; /* text-gray-900 */
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgb(107, 114, 128) !important; /* text-gray-500 */
+}
+
+/* Notification toast animation */
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+

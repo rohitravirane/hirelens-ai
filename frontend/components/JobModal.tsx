@@ -83,7 +83,7 @@ export default function JobModal({ isOpen, onClose }: JobModalProps) {
                   required
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
                   placeholder="e.g., Senior Backend Engineer"
                 />
               </div>
@@ -96,7 +96,7 @@ export default function JobModal({ isOpen, onClose }: JobModalProps) {
                   required
                   value={formData.company}
                   onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
                   placeholder="e.g., Tech Corp"
                 />
               </div>
@@ -111,7 +111,7 @@ export default function JobModal({ isOpen, onClose }: JobModalProps) {
                   type="text"
                   value={formData.department}
                   onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
                   placeholder="e.g., Engineering"
                 />
               </div>
@@ -123,7 +123,7 @@ export default function JobModal({ isOpen, onClose }: JobModalProps) {
                   type="text"
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
                   placeholder="e.g., San Francisco, CA"
                 />
               </div>
@@ -138,7 +138,7 @@ export default function JobModal({ isOpen, onClose }: JobModalProps) {
                 rows={8}
                 value={formData.raw_text}
                 onChange={(e) => setFormData({ ...formData, raw_text: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
                 placeholder="Paste the full job description here. AI will automatically extract skills, requirements, and experience needed..."
               />
               <p className="mt-1 text-xs text-gray-500">
@@ -154,7 +154,7 @@ export default function JobModal({ isOpen, onClose }: JobModalProps) {
                 <select
                   value={formData.employment_type}
                   onChange={(e) => setFormData({ ...formData, employment_type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
                 >
                   <option value="">Select type</option>
                   <option value="full-time">Full-time</option>

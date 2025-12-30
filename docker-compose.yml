@@ -11,7 +11,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hirelens_user"]
+      test: ["CMD-SHELL", "pg_isready -U hirelens_user -d hirelens_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -96,12 +96,14 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - WATCHPACK_POLLING=true
     depends_on:
       - backend
     volumes:
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
+    command: npm run dev
 
 volumes:
   postgres_data:

@@ -108,7 +108,7 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
                   required
                   value={formData.first_name}
                   onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
                 />
               </div>
               <div>
@@ -120,7 +120,7 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
                   required
                   value={formData.last_name}
                   onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
                 />
               </div>
             </div>
@@ -135,7 +135,7 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
                 />
               </div>
               <div>
@@ -146,7 +146,7 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
                 />
               </div>
             </div>
@@ -159,7 +159,7 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
                 required
                 value={formData.resume_id}
                 onChange={(e) => setFormData({ ...formData, resume_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
               >
                 <option value="">Select a resume</option>
                 {resumes.map((resume) => (
@@ -182,7 +182,7 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
                   type="url"
                   value={formData.linkedin_url}
                   onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
                   placeholder="https://linkedin.com/in/..."
                 />
               </div>
@@ -194,7 +194,7 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
                   type="url"
                   value={formData.portfolio_url}
                   onChange={(e) => setFormData({ ...formData, portfolio_url: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
                   placeholder="https://..."
                 />
               </div>
@@ -208,7 +208,7 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
                 rows={3}
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
                 placeholder="Additional notes about the candidate..."
               />
             </div>

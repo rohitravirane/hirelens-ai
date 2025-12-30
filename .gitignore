@@ -81,3 +81,7 @@ resumes/
 # Redis dump
 dump.rdb
 
+# Celery
+celerybeat-schedule
+celerybeat.pid
+

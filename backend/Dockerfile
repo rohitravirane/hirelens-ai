@@ -9,8 +9,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
+# Install torch from CPU-only index first (lighter, faster)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir torch==2.1.1 --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir -r requirements.txt || \
+    pip install --no-cache-dir -r requirements.txt
 
 # Download spaCy language model (optional, can fail gracefully)
 RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed, will use fallback"

@@ -1,10 +1,14 @@
+'use client'
+
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import api from '@/lib/api'
 
 export function useAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
+  const router = useRouter()
 
   useEffect(() => {
     checkAuth()
@@ -41,10 +45,30 @@ export function useAuth() {
   }
 
   const logout = () => {
+    // Clear all auth data immediately
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
+    
+    // Clear state
     setIsAuthenticated(false)
     setUser(null)
+    
+    // Clear any cached queries/data
+    if (typeof window !== 'undefined') {
+      // Clear all localStorage items related to auth
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('auth_') || key.startsWith('user_') || key.startsWith('token_')) {
+          localStorage.removeItem(key)
+        }
+      })
+    }
+    
+    // Immediately redirect to login page - use window.location for immediate redirect
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login'
+    } else {
+      router.push('/login')
+    }
   }
 
   return {
