@@ -10,17 +10,20 @@ HireLens AI is not a demo or tutorial project. It's a **real-world, enterprise-g
 
 ### Core Capabilities
 
-- ✅ **Resume Parsing**: Extract structured data from PDF/DOCX resumes
-- ✅ **Job Description Intelligence**: Parse and understand job requirements
-- ✅ **Semantic Matching**: AI-powered candidate-job matching
+- ✅ **AI-Powered Resume Parsing**: Intelligent extraction of structured data from PDF/DOCX resumes using LLMs
+- ✅ **Experience Calculation**: Accurate years of experience calculation from resume date ranges with overlap handling
+- ✅ **Job Description Intelligence**: Parse and understand job requirements with comprehensive descriptions
+- ✅ **Semantic Matching**: AI-powered candidate-job matching with embeddings
 - ✅ **Multi-Dimensional Scoring**: Skill match, experience, projects, domain familiarity
-- ✅ **Explainable AI**: Human-readable explanations for every match
+- ✅ **Explainable AI**: Human-readable explanations for every match with strengths, weaknesses, and recommendations
 - ✅ **Candidate Ranking**: Percentile-based ranking with confidence levels
-- ✅ **Recruiter Dashboard**: Interactive UI with tabs, modals, and drag-drop features
-- ✅ **Job Management**: Create and manage job descriptions with AI-powered parsing
-- ✅ **Resume Upload**: Drag-and-drop resume upload with automatic parsing
+- ✅ **Recruiter Dashboard**: Interactive UI with tabs, modals, drag-drop, and real-time notifications
+- ✅ **Job Management**: Create and manage tech jobs with AI-powered parsing
+- ✅ **Resume Upload**: Drag-and-drop resume upload with automatic AI parsing
 - ✅ **Candidate Management**: Add and manage candidates with resume linking
 - ✅ **Interactive Rankings**: View AI-powered candidate rankings with detailed explanations
+- ✅ **Bulk Matching**: Match all candidates to a job with one click
+- ✅ **Database Management**: Utility scripts for data cleanup and verification
 
 ## 🏗️ Architecture
 
@@ -83,7 +86,7 @@ See [Architecture Documentation](./docs/architecture.md) for detailed architectu
 
 The recruiter dashboard includes:
 
-- **Jobs Tab**: View all jobs, create new jobs with AI-powered parsing
+- **Jobs Tab**: View all jobs (30+ pre-loaded tech jobs), create new jobs with AI-powered parsing
 - **Candidates Tab**: Upload resumes (drag & drop), add candidates, view candidate list
 - **Rankings Tab**: View AI-powered candidate rankings for selected jobs
 - **Interactive Modals**: 
@@ -91,7 +94,12 @@ The recruiter dashboard includes:
   - Resume upload with drag-and-drop support
   - Candidate creation form with resume linking
 - **Match All**: Bulk match all candidates to a job with one click
+- **Real-time Notifications**: Success/error notifications for match operations
 - **AI Explanations**: View detailed AI analysis with strengths, weaknesses, and recommendations
+- **Improved UX**: 
+  - Black text in all form inputs for better readability
+  - Immediate logout redirect to login page
+  - Loading states and visual feedback
 
 ### Default Credentials
 
@@ -117,6 +125,11 @@ hirelens-ai/
 │   │   ├── tasks/          # Async Celery tasks
 │   │   └── main.py         # FastAPI application
 │   ├── scripts/            # Utility scripts
+│   │   ├── init_db.py      # Database initialization
+│   │   ├── create_test_data.py # Test data generation
+│   │   ├── clean_database.py # Database cleanup
+│   │   ├── clean_test_users.py # User cleanup
+│   │   └── verify_clean.py  # Verification scripts
 │   ├── requirements.txt    # Python dependencies
 │   └── Dockerfile
 ├── frontend/
@@ -156,14 +169,21 @@ curl -H "Authorization: Bearer <token>" http://localhost:8000/api/v1/jobs/
 
 ## 📊 Core Features
 
-### 1. Resume Processing
+### 1. AI-Powered Resume Processing
 
-Upload resumes (PDF/DOCX) and extract:
-- Skills
-- Experience (years, roles, companies)
-- Education
-- Projects
-- Certifications
+Upload resumes (PDF/DOCX) and extract using AI:
+- **Skills**: Technical and soft skills extraction
+- **Experience**: Years of experience calculated from date ranges (handles overlapping periods)
+- **Education**: Degrees, institutions, graduation dates
+- **Projects**: Project descriptions and technologies used
+- **Certifications**: Professional certifications and licenses
+- **Languages**: Programming and spoken languages
+
+**Features:**
+- AI-based parsing using LLMs for intelligent extraction
+- Automatic experience calculation from employment history
+- Handles overlapping job periods correctly
+- Fallback to rule-based parser if AI parsing fails
 
 **API Example:**
 ```bash
@@ -242,9 +262,19 @@ Returns candidates sorted by match score with percentile rankings.
 - Models: Sentence Transformers (embeddings), TinyLlama/Mistral (text generation)
 
 **2. OpenAI (Optional - Paid API)**
-- Better quality explanations
+- Better quality explanations and resume parsing
 - Faster API responses
+- More accurate experience extraction
 - Requires API key and internet
+
+### AI Resume Parsing
+
+The system uses AI to intelligently extract information from resumes:
+- **LLM-based parsing**: Uses GPT models for structured data extraction
+- **Experience calculation**: Automatically calculates total years from date ranges
+- **Overlap handling**: Correctly handles overlapping employment periods
+- **Fallback mechanism**: Falls back to rule-based parser if AI parsing fails
+- **Configurable**: Enable/disable AI parsing via `USE_AI_RESUME_PARSER` environment variable
 
 ### Configuration
 
@@ -311,6 +341,11 @@ cd frontend
 npm install
 npm run dev
 ```
+
+**Docker Development:**
+- Frontend hot-reloading enabled in Docker
+- Webpack polling configured for file change detection
+- Changes reflect immediately without container restart
 
 ### Running Tests
 
@@ -398,17 +433,52 @@ npm test
 - **Metrics**: Prometheus-compatible (future)
 - **Error Tracking**: Sentry integration (configurable)
 
+## 🗄️ Database Management
+
+### Utility Scripts
+
+The project includes several utility scripts for database management:
+
+**Clean Database:**
+```bash
+docker-compose exec backend python scripts/clean_database.py
+# Removes all candidates, jobs, resumes, matches (preserves users)
+```
+
+**Clean Test Users:**
+```bash
+docker-compose exec backend python scripts/clean_test_users.py
+# Removes all users except admin
+```
+
+**Verify Clean:**
+```bash
+docker-compose exec backend python scripts/verify_clean.py
+# Shows database status and entity counts
+```
+
+**Create Test Data:**
+```bash
+docker-compose exec backend python scripts/create_test_data.py
+# Generates comprehensive test data for all entities
+```
+
 ## 🚧 Roadmap
 
 ### Phase 1 (Current)
 - ✅ Core matching engine
 - ✅ Explainable AI
+- ✅ AI-powered resume parsing with experience calculation
 - ✅ Interactive recruiter dashboard with tabs
 - ✅ Job creation with AI parsing
+- ✅ 30+ pre-loaded tech jobs with comprehensive descriptions
 - ✅ Resume upload with drag-and-drop
 - ✅ Candidate management
 - ✅ AI-powered rankings with explanations
-- ✅ Match all candidates functionality
+- ✅ Match all candidates functionality with notifications
+- ✅ Improved UI/UX (form styling, logout redirect)
+- ✅ Frontend hot-reloading in Docker
+- ✅ Database cleanup and management scripts
 - ✅ Basic RBAC
 
 ### Phase 2 (Future)
@@ -444,8 +514,23 @@ Built with:
 - PostgreSQL
 - Redis
 - Celery
-- OpenAI
+- OpenAI / Hugging Face
+- Docker & Docker Compose
 - And many other open-source tools
+
+---
+
+## 📝 Recent Updates
+
+### Latest Features (v1.1)
+- ✨ AI-powered resume parsing with intelligent experience calculation
+- ✨ 30+ pre-loaded tech jobs with comprehensive descriptions
+- ✨ Improved UI/UX with better form styling and logout redirect
+- ✨ Real-time notifications for match operations
+- ✨ Frontend hot-reloading in Docker for better development experience
+- ✨ Database cleanup and management utility scripts
+- 🐛 Fixed experience calculation errors in AI explanations
+- 🐛 Fixed Docker PostgreSQL healthcheck configuration
 
 ---
 
