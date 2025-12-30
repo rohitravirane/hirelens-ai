@@ -52,7 +52,19 @@ class Settings(BaseSettings):
     MODEL_DEVICE: str = "cpu"  # "cpu" or "cuda"
     # Production optimizations
     USE_QUANTIZATION: bool = True  # Use 8-bit quantization to reduce memory (recommended for production)
-    MODEL_MAX_MEMORY: Optional[Dict[str, str]] = None  # Memory limits per device, e.g. {"0": "10GiB", "cpu": "20GiB"}
+    # MODEL_MAX_MEMORY handled via env var parsing - use empty string or omit from .env
+    MODEL_MAX_MEMORY: Optional[str] = None  # JSON string in .env, e.g. '{"0": "10GiB", "cpu": "20GiB"}'
+    
+    @property
+    def model_max_memory_dict(self) -> Optional[Dict[str, str]]:
+        """Convert JSON string to dict"""
+        if not self.MODEL_MAX_MEMORY or self.MODEL_MAX_MEMORY.strip() == "":
+            return None
+        import json
+        try:
+            return json.loads(self.MODEL_MAX_MEMORY)
+        except (json.JSONDecodeError, TypeError):
+            return None
     
     # Alternative AI Providers
     ANTHROPIC_API_KEY: Optional[str] = None
@@ -60,16 +72,28 @@ class Settings(BaseSettings):
     
     # File Upload
     MAX_UPLOAD_SIZE_MB: int = 10
-    ALLOWED_FILE_EXTENSIONS: List[str] = ["pdf", "docx", "doc"]
+    # Comma-separated string in .env, converted to list
+    ALLOWED_FILE_EXTENSIONS: str = "pdf,docx,doc"
     UPLOAD_DIR: str = "./uploads"
+    
+    @property
+    def allowed_file_extensions_list(self) -> List[str]:
+        """Convert comma-separated string to list"""
+        return [ext.strip() for ext in self.ALLOWED_FILE_EXTENSIONS.split(",")]
     
     # Async Tasks
     CELERY_BROKER_URL: str = "redis://localhost:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
     
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3001"]
+    # Comma-separated string in .env, converted to list
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
     CORS_ALLOW_CREDENTIALS: bool = True
+    
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Convert comma-separated string to list"""
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
     
     # Observability
     LOG_LEVEL: str = "INFO"

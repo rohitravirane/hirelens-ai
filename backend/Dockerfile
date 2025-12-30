@@ -9,11 +9,15 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
-# Install torch from CPU-only index first (lighter, faster)
+# Install PyTorch with CUDA support (will use CPU if CUDA not available)
 COPY requirements.txt .
-RUN pip install --no-cache-dir torch==2.1.1 --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir -r requirements.txt || \
-    pip install --no-cache-dir -r requirements.txt
+# Try CUDA version first, fallback to CPU if needed
+# Remove torch from requirements.txt temporarily to avoid conflicts
+RUN sed 's/^torch==.*$//' requirements.txt > requirements_no_torch.txt && \
+    pip install --no-cache-dir torch==2.1.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 || \
+    pip install --no-cache-dir torch==2.1.1 --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir -r requirements_no_torch.txt || \
+    pip install --no-cache-dir -r requirements_no_torch.txt
 
 # Download spaCy language model (optional, can fail gracefully)
 RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed, will use fallback"

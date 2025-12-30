@@ -35,6 +35,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: hirelens-backend
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=postgresql://hirelens_user:hirelens_pass@postgres:5432/hirelens_db
       - REDIS_URL=redis://redis:6379/0
@@ -45,6 +47,13 @@ services:
     volumes:
       - ./backend:/app
       - ./uploads:/app/uploads
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,6 +74,13 @@ services:
     volumes:
       - ./backend:/app
       - ./uploads:/app/uploads
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     depends_on:
       - postgres
       - redis
