@@ -23,6 +23,8 @@ HireLens AI is not a demo or tutorial project. It's a **real-world, enterprise-g
 - ✅ **Candidate Management**: Add and manage candidates with resume linking
 - ✅ **Interactive Rankings**: View AI-powered candidate rankings with detailed explanations
 - ✅ **Bulk Matching**: Match all candidates to a job with one click
+- ✅ **Quality Control**: Quality indicators prevent matching with low-quality resume data
+- ✅ **Reprocessing**: One-click reprocessing to improve resume extraction quality
 - ✅ **Database Management**: Utility scripts for data cleanup and verification
 
 ## 🏗️ Architecture
@@ -169,21 +171,26 @@ curl -H "Authorization: Bearer <token>" http://localhost:8000/api/v1/jobs/
 
 ## 📊 Core Features
 
-### 1. AI-Powered Resume Processing
+### 1. World-Class AI-Powered Resume Processing
 
-Upload resumes (PDF/DOCX) and extract using AI:
-- **Skills**: Technical and soft skills extraction
-- **Experience**: Years of experience calculated from date ranges (handles overlapping periods)
-- **Education**: Degrees, institutions, graduation dates
-- **Projects**: Project descriptions and technologies used
+Upload resumes (PDF/DOCX) and extract using advanced AI:
+- **Skills**: Comprehensive technical and soft skills extraction
+- **Experience**: Years of experience calculated from date ranges (handles overlapping periods intelligently)
+- **Education**: Degrees, institutions, graduation dates, fields of study
+- **Projects**: Project descriptions, technologies, and URLs
 - **Certifications**: Professional certifications and licenses
 - **Languages**: Programming and spoken languages
 
-**Features:**
-- AI-based parsing using LLMs for intelligent extraction
-- Automatic experience calculation from employment history
-- Handles overlapping job periods correctly
-- Fallback to rule-based parser if AI parsing fails
+**Advanced Features:**
+- **World-Class AI Parsing**: Enhanced LLM prompts for intelligent extraction from any resume format
+- **Quality Scoring System**: Automatic quality score (0-100) for each parsed resume
+  - Scores based on: Skills extraction, Experience calculation, Education, Projects, Data completeness
+  - Quality indicators in UI show data extraction confidence
+  - Reprocessing available for low-quality extractions
+- **Intelligent Date Parsing**: Handles multiple date formats (YYYY-MM, YYYY, "Present", etc.)
+- **Automatic Experience Calculation**: Handles overlapping job periods correctly
+- **Fallback System**: Rule-based parser if AI parsing fails
+- **Reprocessing**: One-click reprocessing to improve extraction quality
 
 **API Example:**
 ```bash
@@ -269,11 +276,17 @@ Returns candidates sorted by match score with percentile rankings.
 
 ### AI Resume Parsing
 
-The system uses AI to intelligently extract information from resumes:
-- **LLM-based parsing**: Uses GPT models for structured data extraction
+The system uses world-class AI to intelligently extract information from resumes:
+- **Enhanced LLM-based parsing**: Advanced GPT prompts for comprehensive data extraction from any format
+- **Quality Scoring**: Automatic quality score (0-100) indicates extraction confidence
+  - 80-100%: Excellent quality, ready for matching
+  - 50-79%: Moderate quality, reprocessing recommended
+  - <50%: Poor quality, reprocessing required
 - **Experience calculation**: Automatically calculates total years from date ranges
 - **Overlap handling**: Correctly handles overlapping employment periods
+- **Date normalization**: Handles multiple date formats intelligently
 - **Fallback mechanism**: Falls back to rule-based parser if AI parsing fails
+- **Reprocessing**: One-click reprocessing to improve extraction quality
 - **Configurable**: Enable/disable AI parsing via `USE_AI_RESUME_PARSER` environment variable
 
 ### Configuration
@@ -468,15 +481,16 @@ docker-compose exec backend python scripts/create_test_data.py
 ### Phase 1 (Current)
 - ✅ Core matching engine
 - ✅ Explainable AI
-- ✅ AI-powered resume parsing with experience calculation
+- ✅ World-class AI-powered resume parsing with quality scoring
+- ✅ Quality indicators and reprocessing system
 - ✅ Interactive recruiter dashboard with tabs
 - ✅ Job creation with AI parsing
 - ✅ 30+ pre-loaded tech jobs with comprehensive descriptions
 - ✅ Resume upload with drag-and-drop
-- ✅ Candidate management
+- ✅ Candidate management with quality indicators
 - ✅ AI-powered rankings with explanations
 - ✅ Match all candidates functionality with notifications
-- ✅ Improved UI/UX (form styling, logout redirect)
+- ✅ Improved UI/UX (form styling, logout redirect, responsive design)
 - ✅ Frontend hot-reloading in Docker
 - ✅ Database cleanup and management scripts
 - ✅ Basic RBAC
@@ -522,8 +536,12 @@ Built with:
 
 ## 📝 Recent Updates
 
-### Latest Features (v1.1)
-- ✨ AI-powered resume parsing with intelligent experience calculation
+### Latest Features (v1.2)
+- ✨ **World-Class Resume Parsing**: Enhanced AI prompts for comprehensive data extraction
+- ✨ **Quality Scoring System**: Automatic quality score (0-100) for each parsed resume
+- ✨ **Quality Indicators**: Visual indicators in UI showing data extraction confidence
+- ✨ **Reprocessing**: One-click reprocessing to improve extraction quality
+- ✨ **Smart Blocking**: Prevents matching if resume quality is too low (<80%)
 - ✨ 30+ pre-loaded tech jobs with comprehensive descriptions
 - ✨ Improved UI/UX with better form styling and logout redirect
 - ✨ Real-time notifications for match operations

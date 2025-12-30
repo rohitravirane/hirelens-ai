@@ -53,6 +53,7 @@ class ResumeVersion(Base):
     is_current = Column(Boolean, default=True)
     parsed_at = Column(DateTime(timezone=True), server_default=func.now())
     parser_version = Column(String(50))  # Version of parser used
+    quality_score = Column(Integer)  # Quality score 0-100 for parsed data
     
     # Relationships
     resume = relationship("Resume", back_populates="versions")

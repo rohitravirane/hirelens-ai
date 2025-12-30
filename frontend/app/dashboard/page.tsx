@@ -7,6 +7,8 @@ import { useAuth } from '@/hooks/useAuth'
 import JobModal from '@/components/JobModal'
 import ResumeUpload from '@/components/ResumeUpload'
 import CandidateModal from '@/components/CandidateModal'
+import JobDetailsModal from '@/components/JobDetailsModal'
+import CandidateDetailsModal from '@/components/CandidateDetailsModal'
 
 export default function DashboardPage() {
   const { user, logout } = useAuth()
@@ -15,6 +17,10 @@ export default function DashboardPage() {
   const [showJobModal, setShowJobModal] = useState(false)
   const [showResumeModal, setShowResumeModal] = useState(false)
   const [showCandidateModal, setShowCandidateModal] = useState(false)
+  const [showJobDetailsModal, setShowJobDetailsModal] = useState(false)
+  const [showCandidateDetailsModal, setShowCandidateDetailsModal] = useState(false)
+  const [selectedJobDetailsId, setSelectedJobDetailsId] = useState<number | null>(null)
+  const [selectedCandidateDetailsId, setSelectedCandidateDetailsId] = useState<number | null>(null)
   const [selectedResumeId, setSelectedResumeId] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<'jobs' | 'candidates' | 'rankings'>('jobs')
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -128,8 +134,8 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Notification Toast */}
       {notification && (
-        <div className="fixed top-4 right-4 z-50 animate-slide-in">
-          <div className={`rounded-lg shadow-lg p-4 max-w-md ${
+        <div className="fixed top-4 right-4 left-4 sm:left-auto z-50 animate-slide-in">
+          <div className={`rounded-lg shadow-lg p-4 max-w-md mx-auto sm:mx-0 ${
             notification.type === 'success' 
               ? 'bg-green-50 border border-green-200' 
               : 'bg-red-50 border border-red-200'
@@ -164,13 +170,13 @@ export default function DashboardPage() {
 
       {/* Header */}
       <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">HireLens AI</h1>
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">{user?.email}</span>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">HireLens AI</h1>
+          <div className="flex items-center space-x-3 sm:space-x-4 w-full sm:w-auto justify-between sm:justify-end">
+            <span className="text-xs sm:text-sm text-gray-600 truncate max-w-[150px] sm:max-w-none">{user?.email}</span>
             <button
               onClick={logout}
-              className="text-sm text-primary-600 hover:text-primary-700 px-3 py-1 rounded hover:bg-gray-100"
+              className="text-xs sm:text-sm text-primary-600 hover:text-primary-700 px-3 py-1 rounded hover:bg-gray-100 whitespace-nowrap"
             >
               Logout
             </button>
@@ -181,11 +187,11 @@ export default function DashboardPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Tabs */}
         <div className="mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
+          <div className="border-b border-gray-200 overflow-x-auto overflow-y-hidden -mx-4 sm:mx-0 px-4 sm:px-0">
+            <nav className="-mb-px flex space-x-4 sm:space-x-8 min-w-max sm:min-w-0">
               <button
                 onClick={() => setActiveTab('jobs')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-2 sm:px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                   activeTab === 'jobs'
                     ? 'border-primary-500 text-primary-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -195,7 +201,7 @@ export default function DashboardPage() {
               </button>
               <button
                 onClick={() => setActiveTab('candidates')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-2 sm:px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                   activeTab === 'candidates'
                     ? 'border-primary-500 text-primary-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -205,7 +211,7 @@ export default function DashboardPage() {
               </button>
               <button
                 onClick={() => setActiveTab('rankings')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-2 sm:px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                   activeTab === 'rankings'
                     ? 'border-primary-500 text-primary-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -220,11 +226,11 @@ export default function DashboardPage() {
         {/* Jobs Tab */}
         {activeTab === 'jobs' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-900">Job Descriptions</h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Job Descriptions</h2>
               <button
                 onClick={() => setShowJobModal(true)}
-                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 flex items-center space-x-2"
+                className="w-full sm:w-auto px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 flex items-center justify-center space-x-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -243,11 +249,7 @@ export default function DashboardPage() {
                 {jobs.map((job: any) => (
                   <div
                     key={job.id}
-                    className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => {
-                      setSelectedJobId(job.id)
-                      setActiveTab('rankings')
-                    }}
+                    className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow"
                   >
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">{job.title}</h3>
                     <p className="text-sm text-gray-600 mb-4">{job.company}</p>
@@ -271,10 +273,31 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     )}
-                    <div className="mt-4 pt-4 border-t">
+                    <div className="mt-4 pt-4 border-t flex flex-col sm:flex-row gap-2">
                       <span className="text-xs text-gray-500">
                         Created: {new Date(job.created_at).toLocaleDateString()}
                       </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setSelectedJobDetailsId(job.id)
+                            setShowJobDetailsModal(true)
+                          }}
+                          className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                        >
+                          View Details
+                        </button>
+                        <span className="text-gray-300">|</span>
+                        <button
+                          onClick={() => {
+                            setSelectedJobId(job.id)
+                            setActiveTab('rankings')
+                          }}
+                          className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                        >
+                          View Rankings
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -300,12 +323,12 @@ export default function DashboardPage() {
         {/* Candidates Tab */}
         {activeTab === 'candidates' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-900">Candidates</h2>
-              <div className="flex space-x-3">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Candidates</h2>
+              <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2 sm:gap-3">
                 <button
                   onClick={() => setShowResumeModal(true)}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center space-x-2"
+                  className="w-full sm:w-auto px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center justify-center space-x-2"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -314,7 +337,7 @@ export default function DashboardPage() {
                 </button>
                 <button
                   onClick={() => setShowCandidateModal(true)}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 flex items-center space-x-2"
+                  className="w-full sm:w-auto px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 flex items-center justify-center space-x-2"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -330,74 +353,153 @@ export default function DashboardPage() {
                 <p className="mt-4 text-gray-500">Loading candidates...</p>
               </div>
             ) : candidates && candidates.length > 0 ? (
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Name
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Email
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {candidates.map((candidate: any) => (
-                      <tr key={candidate.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {candidate.first_name} {candidate.last_name}
+              <>
+                {/* Desktop Table View */}
+                <div className="hidden md:block bg-white rounded-lg shadow overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Email
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {candidates.map((candidate: any) => (
+                        <tr key={candidate.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {candidate.first_name} {candidate.last_name}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">{candidate.email}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              candidate.status === 'active' ? 'bg-green-100 text-green-800' :
+                              candidate.status === 'shortlisted' ? 'bg-blue-100 text-blue-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {candidate.status || 'active'}
+                            </span>
+                          </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setSelectedCandidateDetailsId(candidate.id)
+                                setShowCandidateDetailsModal(true)
+                              }}
+                              className="p-2 text-gray-600 hover:text-primary-600 hover:bg-gray-100 rounded-md transition-colors"
+                              title="View Details"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            </button>
+                            {selectedJobId && (
+                              <button
+                                onClick={() => matchMutation.mutate({ candidateId: candidate.id, jobId: selectedJobId })}
+                                disabled={matchMutation.isLoading || matchingCandidateId === candidate.id}
+                                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                                  matchMutation.isLoading && matchingCandidateId === candidate.id
+                                    ? 'bg-primary-100 text-primary-700 cursor-wait'
+                                    : 'bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                                }`}
+                              >
+                                {matchMutation.isLoading && matchingCandidateId === candidate.id ? (
+                                  <span className="flex items-center">
+                                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647A7.962 7.962 0 0112 20c4.418 0 8-3.582 8-8h-4a4 4 0 11-8 0v4z"></path>
+                                    </svg>
+                                    Matching...
+                                  </span>
+                                ) : (
+                                  'Match'
+                                )}
+                              </button>
+                            )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-500">{candidate.email}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            candidate.status === 'active' ? 'bg-green-100 text-green-800' :
-                            candidate.status === 'shortlisted' ? 'bg-blue-100 text-blue-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {candidate.status || 'active'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {selectedJobId && (
-                            <button
-                              onClick={() => matchMutation.mutate({ candidateId: candidate.id, jobId: selectedJobId })}
-                              disabled={matchMutation.isLoading || matchingCandidateId === candidate.id}
-                              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                                matchMutation.isLoading && matchingCandidateId === candidate.id
-                                  ? 'bg-primary-100 text-primary-700 cursor-wait'
-                                  : 'bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed'
-                              }`}
-                            >
-                              {matchMutation.isLoading && matchingCandidateId === candidate.id ? (
-                                <span className="flex items-center">
-                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647A7.962 7.962 0 0112 20c4.418 0 8-3.582 8-8h-4a4 4 0 11-8 0v4z"></path>
-                                  </svg>
-                                  Matching...
-                                </span>
-                              ) : (
-                                'Match'
-                              )}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-3">
+                  {candidates.map((candidate: any) => (
+                    <div key={candidate.id} className="bg-white rounded-lg shadow p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h3 className="text-sm font-semibold text-gray-900">
+                            {candidate.first_name} {candidate.last_name}
+                          </h3>
+                          <p className="text-xs text-gray-500 mt-1">{candidate.email}</p>
+                        </div>
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          candidate.status === 'active' ? 'bg-green-100 text-green-800' :
+                          candidate.status === 'shortlisted' ? 'bg-blue-100 text-blue-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {candidate.status || 'active'}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setSelectedCandidateDetailsId(candidate.id)
+                            setShowCandidateDetailsModal(true)
+                          }}
+                          className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors flex items-center justify-center gap-2"
+                          title="View Details"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          Details
+                        </button>
+                        {selectedJobId && (
+                          <button
+                            onClick={() => matchMutation.mutate({ candidateId: candidate.id, jobId: selectedJobId })}
+                            disabled={matchMutation.isLoading || matchingCandidateId === candidate.id}
+                            className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                              matchMutation.isLoading && matchingCandidateId === candidate.id
+                                ? 'bg-primary-100 text-primary-700 cursor-wait'
+                                : 'bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                            }`}
+                          >
+                            {matchMutation.isLoading && matchingCandidateId === candidate.id ? (
+                              <span className="flex items-center justify-center">
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647A7.962 7.962 0 0112 20c4.418 0 8-3.582 8-8h-4a4 4 0 11-8 0v4z"></path>
+                                </svg>
+                                Matching...
+                              </span>
+                            ) : (
+                              'Match'
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             ) : (
               <div className="bg-white rounded-lg shadow p-12 text-center">
                 <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -427,32 +529,20 @@ export default function DashboardPage() {
         {/* Rankings Tab */}
         {activeTab === 'rankings' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col gap-4">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">Candidate Rankings</h2>
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Candidate Rankings</h2>
                 {selectedJobId && jobs && (
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-xs sm:text-sm text-gray-500 mt-1">
                     {jobs.find((j: any) => j.id === selectedJobId)?.title} - {jobs.find((j: any) => j.id === selectedJobId)?.company}
                   </p>
                 )}
               </div>
-              <div className="flex space-x-3">
-                {selectedJobId && candidates && candidates.length > 0 && (
-                  <button
-                    onClick={handleMatchAll}
-                    disabled={bulkMatchMutation.isLoading}
-                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 flex items-center space-x-2"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    <span>{bulkMatchMutation.isLoading ? 'Matching...' : 'Match All Candidates'}</span>
-                  </button>
-                )}
+              <div className="flex flex-col sm:flex-row gap-3">
                 <select
                   value={selectedJobId || ''}
                   onChange={(e) => setSelectedJobId(e.target.value ? parseInt(e.target.value) : null)}
-                  className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
                 >
                   <option value="">Select a job</option>
                   {jobs?.map((job: any) => (
@@ -461,6 +551,18 @@ export default function DashboardPage() {
                     </option>
                   ))}
                 </select>
+                {selectedJobId && candidates && candidates.length > 0 && (
+                  <button
+                    onClick={handleMatchAll}
+                    disabled={bulkMatchMutation.isLoading}
+                    className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 flex items-center justify-center space-x-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span>{bulkMatchMutation.isLoading ? 'Matching...' : 'Match All Candidates'}</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -528,7 +630,7 @@ export default function DashboardPage() {
                         <p className="text-sm text-gray-600 mb-3">
                           {ranking.match_result.ai_explanation.summary}
                         </p>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           {ranking.match_result.ai_explanation.strengths && ranking.match_result.ai_explanation.strengths.length > 0 && (
                             <div>
                               <span className="text-xs font-semibold text-green-700">Strengths:</span>
@@ -554,28 +656,28 @@ export default function DashboardPage() {
                     )}
 
                     {/* Score Breakdown */}
-                    <div className="mt-4 grid grid-cols-4 gap-4">
-                      <div className="text-center p-3 bg-blue-50 rounded">
+                    <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
+                      <div className="text-center p-2 sm:p-3 bg-blue-50 rounded">
                         <div className="text-xs text-gray-500 mb-1">Skills</div>
-                        <div className="text-lg font-semibold text-blue-700">
+                        <div className="text-base sm:text-lg font-semibold text-blue-700">
                           {ranking.match_result.skill_match_score?.toFixed(0) || '0'}
                         </div>
                       </div>
-                      <div className="text-center p-3 bg-green-50 rounded">
+                      <div className="text-center p-2 sm:p-3 bg-green-50 rounded">
                         <div className="text-xs text-gray-500 mb-1">Experience</div>
-                        <div className="text-lg font-semibold text-green-700">
+                        <div className="text-base sm:text-lg font-semibold text-green-700">
                           {ranking.match_result.experience_score?.toFixed(0) || '0'}
                         </div>
                       </div>
-                      <div className="text-center p-3 bg-purple-50 rounded">
+                      <div className="text-center p-2 sm:p-3 bg-purple-50 rounded">
                         <div className="text-xs text-gray-500 mb-1">Projects</div>
-                        <div className="text-lg font-semibold text-purple-700">
+                        <div className="text-base sm:text-lg font-semibold text-purple-700">
                           {ranking.match_result.project_similarity_score?.toFixed(0) || '0'}
                         </div>
                       </div>
-                      <div className="text-center p-3 bg-orange-50 rounded">
+                      <div className="text-center p-2 sm:p-3 bg-orange-50 rounded">
                         <div className="text-xs text-gray-500 mb-1">Domain</div>
-                        <div className="text-lg font-semibold text-orange-700">
+                        <div className="text-base sm:text-lg font-semibold text-orange-700">
                           {ranking.match_result.domain_familiarity_score?.toFixed(0) || '0'}
                         </div>
                       </div>
@@ -621,6 +723,28 @@ export default function DashboardPage() {
           setSelectedResumeId(null)
         }}
         resumeId={selectedResumeId || undefined}
+      />
+      <JobDetailsModal
+        isOpen={showJobDetailsModal}
+        onClose={() => {
+          setShowJobDetailsModal(false)
+          setSelectedJobDetailsId(null)
+        }}
+        jobId={selectedJobDetailsId}
+        onViewRankings={() => {
+          if (selectedJobDetailsId) {
+            setSelectedJobId(selectedJobDetailsId)
+            setActiveTab('rankings')
+          }
+        }}
+      />
+      <CandidateDetailsModal
+        isOpen={showCandidateDetailsModal}
+        onClose={() => {
+          setShowCandidateDetailsModal(false)
+          setSelectedCandidateDetailsId(null)
+        }}
+        candidateId={selectedCandidateDetailsId}
       />
     </div>
   )

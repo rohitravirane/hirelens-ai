@@ -43,6 +43,7 @@ class CandidateResponse(BaseModel):
     status: str
     notes: Optional[str]
     created_at: datetime
+    resume_quality_score: Optional[int] = None  # Quality score from resume (0-100)
     
     class Config:
         from_attributes = True

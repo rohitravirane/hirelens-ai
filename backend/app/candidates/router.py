@@ -11,7 +11,7 @@ from app.core.exceptions import NotFoundError
 from app.auth.dependencies import get_current_active_user
 from app.models.user import User
 from app.models.candidate import Candidate
-from app.models.resume import Resume
+from app.models.resume import Resume, ResumeVersion
 from app.candidates.schemas import CandidateCreate, CandidateUpdate, CandidateResponse
 
 router = APIRouter(prefix="/api/v1/candidates", tags=["Candidates"])
@@ -87,22 +87,37 @@ def list_candidates(
     
     candidates = query.order_by(Candidate.created_at.desc()).offset(skip).limit(limit).all()
     
-    return [
-        CandidateResponse(
-            id=c.id,
-            first_name=c.first_name,
-            last_name=c.last_name,
-            email=c.email,
-            phone=c.phone,
-            linkedin_url=c.linkedin_url,
-            portfolio_url=c.portfolio_url,
-            resume_id=c.resume_id,
-            status=c.status,
-            notes=c.notes,
-            created_at=c.created_at,
+    result = []
+    for c in candidates:
+        # Get resume quality score if resume exists
+        resume_quality_score = None
+        if c.resume_id:
+            latest_version = (
+                db.query(ResumeVersion)
+                .filter(ResumeVersion.resume_id == c.resume_id, ResumeVersion.is_current == True)
+                .first()
+            )
+            if latest_version:
+                resume_quality_score = latest_version.quality_score
+        
+        result.append(
+            CandidateResponse(
+                id=c.id,
+                first_name=c.first_name,
+                last_name=c.last_name,
+                email=c.email,
+                phone=c.phone,
+                linkedin_url=c.linkedin_url,
+                portfolio_url=c.portfolio_url,
+                resume_id=c.resume_id,
+                status=c.status,
+                notes=c.notes,
+                created_at=c.created_at,
+                resume_quality_score=resume_quality_score,
+            )
         )
-        for c in candidates
-    ]
+    
+    return result
 
 
 @router.get("/{candidate_id}", response_model=CandidateResponse)
@@ -116,6 +131,17 @@ def get_candidate(
     if not candidate:
         raise NotFoundError("Candidate", str(candidate_id))
     
+    # Get resume quality score if resume exists
+    resume_quality_score = None
+    if candidate.resume_id:
+        latest_version = (
+            db.query(ResumeVersion)
+            .filter(ResumeVersion.resume_id == candidate.resume_id, ResumeVersion.is_current == True)
+            .first()
+        )
+        if latest_version:
+            resume_quality_score = latest_version.quality_score
+    
     return CandidateResponse(
         id=candidate.id,
         first_name=candidate.first_name,
@@ -128,6 +154,7 @@ def get_candidate(
         status=candidate.status,
         notes=candidate.notes,
         created_at=candidate.created_at,
+        resume_quality_score=resume_quality_score,
     )
 
 

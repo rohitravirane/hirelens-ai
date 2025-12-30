@@ -73,6 +73,13 @@ def process_resume_task(self: Task, resume_id: int):
         )
         version_number = (latest_version.version_number + 1) if latest_version else 1
         
+        # Calculate quality score if not already calculated
+        quality_score = parsed_data.get("quality_score")
+        if quality_score is None:
+            # Calculate quality score
+            from app.resumes.ai_parser import ai_parser
+            quality_score = ai_parser._calculate_quality_score(parsed_data, raw_text)
+        
         resume_version = ResumeVersion(
             resume_id=resume_id,
             version_number=version_number,
@@ -85,7 +92,8 @@ def process_resume_task(self: Task, resume_id: int):
             certifications=parsed_data.get("certifications"),
             languages=parsed_data.get("languages"),
             is_current=True,
-            parser_version="2.0-ai",  # Updated version for AI parsing
+            parser_version="3.0-ai-enhanced",  # Updated version for enhanced AI parsing
+            quality_score=quality_score,
         )
         db.add(resume_version)
         
