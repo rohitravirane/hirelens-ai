@@ -141,14 +141,20 @@ class JobDescriptionParser:
             r'(?:experience|exp)[:\s]+(\d+)\+?\s*(?:years?|yrs?)',
             r'minimum\s+of\s+(\d+)\s*(?:years?|yrs?)',
             r'at\s+least\s+(\d+)\s*(?:years?|yrs?)',
+            r'(\d+)\+?\s*(?:years?|yrs?)\s+(?:of\s+)?(?:professional|software|development|engineering|devops|infrastructure)',
+            r'(\d+)\+?\s*(?:years?|yrs?)\s+(?:in|with)',
+            r'(\d+)\+?\s*(?:years?|yrs?)\s+(?:relevant|related)',
         ]
         
+        # Try each pattern
         for pattern in patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
+            matches = re.finditer(pattern, text, re.IGNORECASE)
+            for match in matches:
                 try:
                     years = int(match.group(1))
-                    return years
+                    # Prefer higher numbers (more specific requirements)
+                    if years >= 1 and years <= 20:  # Reasonable range
+                        return years
                 except ValueError:
                     continue
         
@@ -158,10 +164,29 @@ class JobDescriptionParser:
         """Extract seniority level"""
         text_lower = text.lower()
         
+        # Check title first (most reliable)
+        title_match = re.search(r'^(junior|senior|mid|lead|principal|staff|executive|director)', text_lower)
+        if title_match:
+            title_word = title_match.group(1)
+            for level, keywords in self.seniority_keywords.items():
+                if title_word in keywords:
+                    return level
+        
+        # Check in description
         for level, keywords in self.seniority_keywords.items():
             for keyword in keywords:
                 if keyword in text_lower:
                     return level
+        
+        # Infer from experience years if available
+        experience = self._extract_experience_years(text)
+        if experience:
+            if experience >= 7:
+                return "senior"
+            elif experience >= 4:
+                return "mid"
+            elif experience >= 1:
+                return "junior"
         
         return None
     

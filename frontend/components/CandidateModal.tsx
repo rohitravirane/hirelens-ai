@@ -49,8 +49,8 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
   }
 
   const fetchResumePersonalInfoWithRetry = async (id: number, retryCount = 0) => {
-    const maxRetries = 5
-    const retryDelay = 1000 * Math.pow(2, retryCount) // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+    const maxRetries = 10 // Increased retries for better reliability
+    const retryDelay = 1000 * Math.pow(1.5, retryCount) // Slower backoff: 1s, 1.5s, 2.25s, 3.4s, etc.
     
     if (retryCount === 0) {
       setLoadingResumeData(true)
@@ -60,8 +60,20 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
       const response = await api.get(`/api/v1/resumes/${id}`)
       const latestVersion = response.data.latest_version
       
-      if (latestVersion && (latestVersion.first_name || latestVersion.email)) {
-        // Data is available, populate form
+      // Check if resume is still processing
+      if (response.data.processing_status === 'processing' || response.data.processing_status === 'pending') {
+        if (retryCount < maxRetries) {
+          setTimeout(() => {
+            fetchResumePersonalInfoWithRetry(id, retryCount + 1)
+          }, retryDelay)
+        } else {
+          setLoadingResumeData(false)
+        }
+        return
+      }
+      
+      // Data is available, populate form
+      if (latestVersion && (latestVersion.first_name || latestVersion.email || latestVersion.phone)) {
         setFormData(prev => ({
           ...prev,
           first_name: latestVersion.first_name || prev.first_name,

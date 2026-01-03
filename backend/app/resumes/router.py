@@ -125,8 +125,23 @@ def get_resume(
         .first()
     )
     
-    # Extract personal info from parsed_data if available
+    # Extract personal info from parsed_data and candidate model
     personal_info = {}
+    
+    # First, check if candidate exists (created from kundali)
+    from app.models.candidate import Candidate
+    candidate = db.query(Candidate).filter(Candidate.resume_id == resume_id).first()
+    if candidate:
+        personal_info = {
+            "first_name": candidate.first_name or "",
+            "last_name": candidate.last_name or "",
+            "email": candidate.email or "",
+            "phone": candidate.phone or "",
+            "linkedin_url": candidate.linkedin_url or "",
+            "portfolio_url": candidate.portfolio_url or "",
+        }
+    
+    # Also check parsed_data (fallback or additional info)
     if latest_version and latest_version.parsed_data:
         # parsed_data is stored as JSON, might be dict or string
         parsed_data = latest_version.parsed_data
@@ -136,19 +151,75 @@ def get_resume(
             except (json.JSONDecodeError, TypeError):
                 parsed_data = {}
         if isinstance(parsed_data, dict):
-            personal_info = {
-                "first_name": parsed_data.get("first_name") or "",
-                "last_name": parsed_data.get("last_name") or "",
-                "email": parsed_data.get("email") or "",
-                "phone": parsed_data.get("phone") or "",
-                "linkedin_url": parsed_data.get("linkedin_url") or "",
-                "portfolio_url": parsed_data.get("portfolio_url") or "",
-            }
+            # Only fill in missing fields from parsed_data
+            if not personal_info.get("first_name"):
+                # Try to split name if first_name not available
+                name = parsed_data.get("name") or parsed_data.get("first_name", "")
+                if name and name != "unknown":
+                    name_parts = name.split(" ", 1)
+                    personal_info["first_name"] = name_parts[0] if name_parts else ""
+                    personal_info["last_name"] = name_parts[1] if len(name_parts) > 1 else ""
+                else:
+                    personal_info["first_name"] = parsed_data.get("first_name") or ""
+                    personal_info["last_name"] = parsed_data.get("last_name") or ""
+            
+            # Fill in other missing fields
+            if not personal_info.get("email"):
+                personal_info["email"] = parsed_data.get("email") or ""
+            if not personal_info.get("phone"):
+                personal_info["phone"] = parsed_data.get("phone") or ""
+            if not personal_info.get("linkedin_url"):
+                # Check contact object too
+                contact = parsed_data.get("contact", {})
+                personal_info["linkedin_url"] = parsed_data.get("linkedin_url") or contact.get("linkedin") or ""
+            if not personal_info.get("portfolio_url"):
+                contact = parsed_data.get("contact", {})
+                personal_info["portfolio_url"] = parsed_data.get("portfolio_url") or contact.get("portfolio") or ""
     
     # Normalize skills format (dict to list) if needed
     normalized_skills = None
     if latest_version and latest_version.skills:
         normalized_skills = ResumeVersionResponse.normalize_skills(latest_version.skills)
+    
+    # Normalize experience format for frontend compatibility
+    normalized_experience = None
+    if latest_version and latest_version.experience:
+        import json
+        experience_data = latest_version.experience
+        if isinstance(experience_data, str):
+            try:
+                experience_data = json.loads(experience_data)
+            except (json.JSONDecodeError, TypeError):
+                experience_data = []
+        
+        if isinstance(experience_data, list):
+            normalized_experience = []
+            for exp in experience_data:
+                # Transform Kundali format to frontend-expected format
+                normalized_exp = {
+                    "title": exp.get("role") or exp.get("title") or exp.get("position") or "N/A",
+                    "position": exp.get("role") or exp.get("position") or "N/A",
+                    "company": exp.get("company") or exp.get("organization") or "N/A",
+                    "organization": exp.get("company") or exp.get("organization") or "N/A",
+                    "start_date": exp.get("start_date") or "N/A",
+                    "end_date": exp.get("end_date") or (exp.get("is_current") and "Present" or "N/A"),
+                    "location": exp.get("location") or "",
+                    "description": ""
+                }
+                
+                # Convert responsibilities array to description string
+                responsibilities = exp.get("responsibilities", [])
+                if isinstance(responsibilities, list) and responsibilities:
+                    normalized_exp["description"] = "\n".join([f"• {r}" for r in responsibilities if r])
+                elif exp.get("description"):
+                    normalized_exp["description"] = exp.get("description")
+                
+                # Add technologies if available
+                technologies = exp.get("technologies_used", [])
+                if technologies:
+                    normalized_exp["technologies"] = technologies
+                
+                normalized_experience.append(normalized_exp)
     
     return ResumeDetailResponse(
         id=resume.id,
@@ -165,7 +236,7 @@ def get_resume(
             skills=normalized_skills,
             experience_years=latest_version.experience_years,
             education=latest_version.education,
-            experience=latest_version.experience,
+            experience=normalized_experience or latest_version.experience,
             projects=latest_version.projects,
             parsed_at=latest_version.parsed_at,
             quality_score=latest_version.quality_score,

@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.models.candidate import Candidate
+from app.models.candidate_kundali import CandidateKundali
 from app.models.resume import Resume, ResumeVersion
 from app.models.job import JobDescription
 from app.models.matching import MatchResult, AIExplanation
@@ -38,6 +39,11 @@ def clean_database():
         db.query(ResumeVersion).delete()
         logger.info("deleted_resume_versions", count=resume_versions_count)
         
+        # Delete Candidate Kundalis (must be deleted before Candidates due to FK constraint)
+        candidate_kundalis_count = db.query(CandidateKundali).count()
+        db.query(CandidateKundali).delete()
+        logger.info("deleted_candidate_kundalis", count=candidate_kundalis_count)
+        
         # Delete Candidates
         candidates_count = db.query(Candidate).count()
         db.query(Candidate).delete()
@@ -58,6 +64,7 @@ def clean_database():
         print(f"   - Deleted {ai_explanations_count} AI Explanations")
         print(f"   - Deleted {match_results_count} Match Results")
         print(f"   - Deleted {resume_versions_count} Resume Versions")
+        print(f"   - Deleted {candidate_kundalis_count} Candidate Kundalis")
         print(f"   - Deleted {candidates_count} Candidates")
         print(f"   - Deleted {resumes_count} Resumes")
         print(f"\n✅ Preserved:")

@@ -24,7 +24,7 @@ def create_candidate(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Create a new candidate"""
+    """Create a new candidate or update existing one if it already exists for this resume"""
     # Verify resume exists
     resume = db.query(Resume).filter(Resume.id == candidate_data.resume_id).first()
     if not resume:
@@ -33,11 +33,44 @@ def create_candidate(
     # Check if candidate already exists with this resume
     existing = db.query(Candidate).filter(Candidate.resume_id == candidate_data.resume_id).first()
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Candidate already exists for this resume",
+        # Update existing candidate instead of creating new one
+        logger.info("candidate_already_exists_updating", candidate_id=existing.id, resume_id=candidate_data.resume_id)
+        
+        if candidate_data.first_name is not None:
+            existing.first_name = candidate_data.first_name
+        if candidate_data.last_name is not None:
+            existing.last_name = candidate_data.last_name
+        if candidate_data.email is not None:
+            existing.email = candidate_data.email
+        if candidate_data.phone is not None:
+            existing.phone = candidate_data.phone
+        if candidate_data.linkedin_url is not None:
+            existing.linkedin_url = candidate_data.linkedin_url
+        if candidate_data.portfolio_url is not None:
+            existing.portfolio_url = candidate_data.portfolio_url
+        if candidate_data.notes is not None:
+            existing.notes = candidate_data.notes
+        
+        db.commit()
+        db.refresh(existing)
+        
+        logger.info("candidate_updated", candidate_id=existing.id)
+        
+        return CandidateResponse(
+            id=existing.id,
+            first_name=existing.first_name,
+            last_name=existing.last_name,
+            email=existing.email,
+            phone=existing.phone,
+            linkedin_url=existing.linkedin_url,
+            portfolio_url=existing.portfolio_url,
+            resume_id=existing.resume_id,
+            status=existing.status,
+            notes=existing.notes,
+            created_at=existing.created_at,
         )
     
+    # Create new candidate
     candidate = Candidate(
         first_name=candidate_data.first_name,
         last_name=candidate_data.last_name,

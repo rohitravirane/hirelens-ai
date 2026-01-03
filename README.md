@@ -781,7 +781,45 @@ Built with:
 
 ## 📝 Recent Updates
 
-### Latest Features (v2.0 - Vision-First Architecture)
+### Latest Features (v2.1 - Enhanced Qwen Vision Parsing)
+
+**Resume Extraction Improvements:**
+- ✨ **Improved Qwen Vision-Based Parsing**: Enhanced extraction accuracy with better prompts
+  - **Anti-Hallucination Rules**: Strict instructions to prevent model from inventing companies/roles
+  - **Complete Experience Extraction**: Extracts ALL experience entries (no missing entries)
+  - **Accurate Company Names**: Extracts exact company names (e.g., Deloitte, Randstad) without hallucination
+  - **Complete Skills Extraction**: Extracts ALL skills visible in resume (frontend, backend, tools)
+  - **Text-Only Model Support**: Properly uses extracted `raw_text` for text-only models (not PDF base64)
+  - **Email/Phone Fallback**: Regex-based fallback extraction if AI fails to extract contact info
+  - **URL Normalization**: Automatically adds `https://` prefix to LinkedIn, GitHub, portfolio URLs
+
+**Frontend Enhancements:**
+- ✨ **Auto-Fill Candidate Form**: Automatically populates form fields from extracted resume data
+  - First Name, Last Name, Email, Phone auto-filled
+  - LinkedIn URL, Portfolio URL auto-filled
+  - Loading indicator while data is being fetched
+  - Exponential backoff retry mechanism for async processing
+- ✨ **Enhanced Candidate Details Modal**: 
+  - Experience entries display with job titles, companies, dates
+  - Responsibilities displayed as formatted description
+  - Technologies used shown as badges for each experience entry
+  - Skills displayed in categorized badges
+  - Education, Projects, Certifications properly formatted
+- ✨ **Improved Data Display**: Experience data normalized for frontend compatibility
+  - Role → Title/Position mapping
+  - Responsibilities array → Description string conversion
+  - Technologies displayed as visual badges
+
+**Backend Improvements:**
+- 🔧 **Duplicate Candidate Handling**: Backend gracefully handles duplicate candidate creation (updates instead of error)
+- 🔧 **Experience Data Normalization**: Transforms Kundali format to frontend-expected format
+- 🔧 **Better Error Handling**: Comprehensive error handling with fallback mechanisms
+
+**Code Cleanup:**
+- 🧹 **Removed Temporary Scripts**: Cleaned up temporary testing/debugging scripts
+- 🧹 **Code Organization**: Better structure and maintainability
+
+### Previous Features (v2.0 - Vision-First Architecture)
 
 **Major Architecture Upgrade:**
 - ✨ **Vision-First Document AI System**: Complete upgrade to production-grade vision-first architecture

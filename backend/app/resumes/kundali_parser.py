@@ -96,7 +96,7 @@ class CandidateKundaliParser:
         
         Args:
             pdf_path: Path to PDF file
-            text_from_pdf: Optional extracted text (not used, kept for compatibility)
+            text_from_pdf: Optional extracted text (used for text-only models)
         
         Returns:
             Candidate Kundali (structured JSON with confidence scores)
@@ -112,15 +112,21 @@ class CandidateKundaliParser:
             
             logger.info("pdf_file_read", pdf_path=pdf_path, size_bytes=len(pdf_data))
             
-            # Step 2: Extract using Qwen with PDF directly
+            # Step 2: Extract using Qwen
             if self.ollama_available:
                 try:
                     # Try vision model first if available
                     if self.use_vision and self.vision_model:
                         kundali = self._extract_with_pdf_direct(pdf_data, pdf_path)
                     else:
-                        # Use text-only model with PDF
-                        kundali = self._extract_with_pdf_direct(pdf_data, pdf_path, use_text_model=True)
+                        # Use text-only model with extracted text (better than PDF base64)
+                        if text_from_pdf:
+                            logger.info("using_extracted_text_for_text_model", text_length=len(text_from_pdf))
+                            kundali = self._extract_with_text(text_from_pdf)
+                        else:
+                            # Fallback: try PDF base64 (may not work well)
+                            logger.warning("no_extracted_text_available_using_pdf_base64")
+                            kundali = self._extract_with_pdf_direct(pdf_data, pdf_path, use_text_model=True)
                 except Exception as e:
                     logger.error("pdf_extraction_failed", error=str(e), exc_info=True)
                     return self._empty_kundali()
@@ -238,11 +244,18 @@ class CandidateKundaliParser:
         """
         prompt = """You are an expert resume parser for HireLens AI, a production-grade hiring intelligence platform.
 
-CRITICAL CONSTRAINTS:
-- Extract ONLY what is visible in the resume PDF document
-- If data is missing → return "unknown" (NEVER invent)
+CRITICAL CONSTRAINTS - READ CAREFULLY:
+- Extract ONLY what is VISIBLE in the resume PDF document - NOTHING ELSE
+- If data is missing → return "unknown" (NEVER invent, NEVER guess, NEVER assume)
+- NEVER invent company names, job titles, or roles that are not explicitly written
+- NEVER create fake experience entries - only extract what is actually listed
+- If you see "Deloitte" → extract "Deloitte", NOT "Tech Innovations Inc."
+- If you see "Full-Stack Developer" → extract "Full-Stack Developer", NOT "Software Engineer"
+- Extract ALL experience entries listed - don't combine or merge them
+- Extract ALL skills mentioned - don't skip any
 - Personality traits MUST have confidence scores (0.0-1.0)
 - Evidence-based inference only (back claims with resume content)
+- If uncertain about ANY field → use "unknown" instead of guessing
 
 TASK:
 Analyze the resume PDF document and extract a complete Candidate Kundali (360° profile).
@@ -251,16 +264,16 @@ OUTPUT FORMAT (STRICT JSON):
 {{
   "candidate_kundali": {{
     "identity": {{
-      "name": "string (extract from header)",
-      "email": "string (extract, validate format)",
-      "phone": "string (extract, normalize)",
-      "location": "string (city, country if visible)"
+      "name": "string (FULL name from header: first name + last name, e.g., 'John Doe' or 'Aleks Ludkee')",
+      "email": "string (extract email address, validate format like user@domain.com)",
+      "phone": "string (extract phone number, normalize format like (123) 456-7890 or +1-123-456-7890)",
+      "location": "string (city, state/country if visible, e.g., 'Nashville, TN' or 'Bangalore, India')"
     }},
     "online_presence": {{
-      "portfolio": ["array of portfolio/personal website URLs"],
-      "github": ["array of GitHub profile URLs"],
-      "linkedin": ["array of LinkedIn profile URLs"],
-      "other_links": ["array of other URLs: Twitter, Kaggle, Medium, Behance, etc."]
+      "portfolio": ["array of portfolio/personal website URLs - extract ALL portfolio links found"],
+      "github": ["array of GitHub profile URLs - extract ALL GitHub links (github.com/username)"],
+      "linkedin": ["array of LinkedIn profile URLs - extract ALL LinkedIn links (linkedin.com/in/username)"],
+      "other_links": ["array of ALL other URLs found: Twitter, Kaggle, Medium, Behance, Stack Overflow, personal websites, etc. - include full URLs with https://"]
     }},
     "summary": "string (professional summary/profile if present)",
     "total_experience_years": number (calculated from experience dates),
@@ -274,17 +287,18 @@ OUTPUT FORMAT (STRICT JSON):
     ],
     "experience": [
       {{
-        "company": "string",
-        "role": "string (job title)",
-        "start_date": "string (YYYY-MM format)",
-        "end_date": "string ('present' if current, else YYYY-MM)",
-        "is_current": boolean,
-        "responsibilities": ["array of responsibility bullets"],
-        "technologies_used": ["array of technologies mentioned"],
+        "company": "string (EXACT company name as written, e.g., 'Deloitte' or 'Randstad Technologies')",
+        "role": "string (EXACT job title as written, e.g., 'Full-Stack Developer' or 'Jr. Full-Stack Developer')",
+        "start_date": "string (YYYY-MM format, extract from dates like 'August 2020' → '2020-08')",
+        "end_date": "string ('present' if current, else YYYY-MM format)",
+        "is_current": boolean (true if end date is 'present', 'current', or 'now'),
+        "responsibilities": ["array of ALL responsibility bullets for this role"],
+        "technologies_used": ["array of technologies mentioned in this role"],
         "quantified_impact": ["array of metrics/numbers/percentages mentioned"],
         "promotions": ["array of role changes within same company if visible"]
       }}
     ],
+    NOTE: Include ALL experience entries found. If resume has 2 jobs, return 2 entries. If resume has 3 jobs, return 3 entries. DO NOT combine or merge them.
     "projects": [
       {{
         "name": "string",
@@ -295,21 +309,23 @@ OUTPUT FORMAT (STRICT JSON):
       }}
     ],
     "skills": {{
-      "frontend": ["array of frontend technologies"],
-      "backend": ["array of backend technologies"],
-      "data": ["array of data technologies: SQL, NoSQL, etc."],
-      "devops": ["array of DevOps tools"],
-      "ai_ml": ["array of AI/ML technologies"],
-      "tools": ["array of development tools"],
-      "soft_skills": ["array of soft skills mentioned: communication, leadership, etc."]
+      "frontend": ["array of ALL frontend technologies mentioned: JavaScript, HTML, CSS, React.js, Angular.js, Vue.js, etc."],
+      "backend": ["array of ALL backend technologies mentioned: Node.js, .NET, Spring, Express, Django, etc."],
+      "data": ["array of ALL data technologies mentioned: SQL, NoSQL, MongoDB, MySQL, PostgreSQL, etc."],
+      "devops": ["array of ALL DevOps tools mentioned: Docker, Kubernetes, Git, CI/CD, etc."],
+      "ai_ml": ["array of AI/ML technologies if mentioned"],
+      "tools": ["array of ALL development tools mentioned: Git, Jira, Webpack, etc."],
+      "soft_skills": ["array of soft skills mentioned: Scrum/Agile, communication, leadership, etc."]
     }},
+    NOTE: Extract EVERY skill mentioned in the Skills section. Common skills include: JavaScript, HTML, CSS, .NET, React.js, Angular.js, Node.js, REST APIs, Spring, SOAP, Scrum/Agile. DO NOT skip any skills.
     "certifications": [
       {{
-        "name": "string",
-        "issuer": "string",
-        "year": "string (if visible)"
+        "name": "string (EXACT certification name as written, e.g., 'MTA' or 'AWS')",
+        "issuer": "string (if visible, otherwise null)",
+        "year": "string (if visible, otherwise null)"
       }}
     ],
+    NOTE: Extract ALL certifications mentioned. Common formats: "MTA", "AWS", "Certified XYZ". Extract exactly as written.
     "languages": ["array of spoken languages"],
     "seniority_assessment": {{
       "level": "junior|mid|senior|staff|principal",
@@ -330,21 +346,137 @@ OUTPUT FORMAT (STRICT JSON):
   }}
 }}
 
-EXTRACTION RULES:
-1. ONLINE PRESENCE: Extract ALL URLs found (GitHub, LinkedIn, portfolio, Twitter, etc.)
-2. EXPERIENCE: Extract technologies mentioned, metrics (numbers, %), impact statements
-3. PROJECTS: Distinguish personal vs company projects (look for "personal project", "side project", GitHub links)
-4. SKILLS: Categorize properly (Frontend: React, Angular, etc. | Backend: Django, Node.js, etc.)
-5. SENIORITY: Base on years of experience, role titles, leadership indicators
-6. PERSONALITY: Infer from resume structure, use of metrics, project ownership, communication clarity
-7. RED FLAGS: Be honest about gaps, inconsistencies, missing information
+EXTRACTION RULES - FOLLOW STRICTLY:
 
-ANTI-HALLUCINATION:
-- If email not visible → "unknown"
-- If dates unclear → "unknown"
-- If company name unclear → "unknown"
-- NEVER invent companies, roles, or links
+1. IDENTITY: Extract FULL name (exactly as written), email, phone number, and location/address from header section
+
+2. ONLINE PRESENCE: Extract ALL URLs found anywhere in resume:
+   - LinkedIn: linkedin.com/in/* or linkedin.com/profile/*
+   - GitHub: github.com/* 
+   - Portfolio: personal websites, portfolios, blogs
+   - Other: Twitter, Kaggle, Medium, Behance, Stack Overflow, etc.
+   - Include full URLs (with https:// if visible, otherwise add it)
+
+3. EXPERIENCE - CRITICAL: Extract EVERY experience entry listed:
+   - Look for ALL work experience sections
+   - Each job/role is a SEPARATE entry in the array
+   - Extract company name EXACTLY as written (e.g., "Deloitte" not "Tech Innovations")
+   - Extract job title EXACTLY as written (e.g., "Full-Stack Developer" not "Software Engineer")
+   - Extract dates EXACTLY as shown (e.g., "August 2020 - current" or "June 2019 - August 2020")
+   - Extract ALL responsibilities/bullet points for each role
+   - Extract technologies mentioned in each role
+   - DO NOT combine multiple jobs into one entry
+   - DO NOT invent companies or roles that are not visible
+   - If you see "Deloitte" → use "Deloitte", if you see "Randstad Technologies" → use "Randstad Technologies"
+
+4. PROJECTS: Distinguish personal vs company projects (look for "personal project", "side project", GitHub links)
+
+5. SKILLS - EXTRACT ALL MENTIONED:
+   - Look for a Skills section in the resume
+   - Extract EVERY skill/technology mentioned
+   - Common skills: JavaScript, HTML, CSS, .NET, React.js, Angular.js, Node.js, REST APIs, Spring, SOAP, Scrum/Agile
+   - Categorize properly:
+     * Frontend: React, Angular, HTML, CSS, JavaScript, Vue.js, etc.
+     * Backend: Node.js, .NET, Spring, Express, Django, etc.
+     * Data: SQL, NoSQL, MongoDB, MySQL, etc.
+     * DevOps: Docker, Kubernetes, Git, CI/CD, etc.
+     * Tools: Git, Jira, Webpack, etc.
+   - DO NOT skip skills - extract ALL of them
+   - If you see "JavaScript" → include it, if you see "HTML" → include it, if you see ".NET" → include it
+
+6. CERTIFICATIONS - EXTRACT ALL:
+   - Look for Certifications section
+   - Extract ALL certifications mentioned (e.g., "MTA", "AWS")
+   - Extract issuer if visible, year if visible
+   - DO NOT invent certifications
+
+7. EDUCATION: Extract degree, field, institution, and dates EXACTLY as written
+
+8. SENIORITY: Base on years of experience, role titles, leadership indicators
+
+9. PERSONALITY: Infer from resume structure, use of metrics, project ownership, communication clarity
+
+10. RED FLAGS: Be honest about gaps, inconsistencies, missing information
+
+ANTI-HALLUCINATION - STRICT RULES:
+- If email not visible → "unknown" (NEVER invent like "john@example.com")
+- If dates unclear → "unknown" (NEVER guess dates)
+- If company name unclear → "unknown" (NEVER invent company names like "Tech Innovations Inc.")
+- If job title unclear → "unknown" (NEVER invent titles like "Software Engineer")
+- NEVER invent companies, roles, skills, or links
+- NEVER create experience entries that don't exist in the resume
+- NEVER combine multiple jobs into one entry
+- NEVER skip experience entries - extract ALL of them
+- NEVER skip skills - extract ALL mentioned skills
+- If you see "Deloitte" in resume → extract "Deloitte" (not "Tech Innovations")
+- If you see "Randstad Technologies" → extract "Randstad Technologies" (not something else)
+- If you see "Full-Stack Developer" → extract "Full-Stack Developer" (not "Software Engineer")
+- If you see "JavaScript, HTML, CSS" → extract ALL of them (don't skip any)
 - Personality inference MUST have confidence < 0.7 if evidence is weak
+- When in doubt → use "unknown" or empty array, NEVER invent data
+
+CRITICAL EXTRACTION REQUIREMENTS - EXTRACT EVERYTHING VISIBLE:
+
+1. NAME: 
+   - Look at the TOP of the resume, usually in header section
+   - Extract COMPLETE name (first name + last name)
+   - Example: "ALEKS LUDKEE" → name: "Aleks Ludkee"
+   - Example: "John Smith" → name: "John Smith"
+   - If only first name visible → use that, but prefer full name
+
+2. EMAIL:
+   - Look for email addresses in header/contact section (usually at the top of resume)
+   - Common patterns: user@domain.com, user.name@company.com, user_name@domain.co.uk
+   - Email addresses contain @ symbol - scan for this pattern
+   - Extract the COMPLETE email address exactly as shown (including dots, hyphens, etc.)
+   - Example: "a.ludkee@email.com" → email: "a.ludkee@email.com"
+   - Example: "john.doe@company.com" → email: "john.doe@company.com"
+   - If email has icon next to it, still extract it
+   - Email is usually on the same line as phone number or location
+   - CRITICAL: If you see ANY text with @ symbol followed by domain, that's the email - extract it!
+   - ONLY return "unknown" if NO email with @ symbol is visible anywhere in the entire document
+
+3. PHONE:
+   - Look for phone numbers in header/contact section
+   - Common formats: (123) 456-7890, +1-123-456-7890, 123-456-7890
+   - Extract phone number in ANY format found
+   - Keep original format, don't change it unnecessarily
+   - Example: "(123) 456-7890" → phone: "(123) 456-7890"
+   - If phone has icon next to it, still extract it
+
+4. LOCATION/ADDRESS:
+   - Look for city, state, country in header/contact section
+   - Extract location information
+   - Example: "Nashville, TN" → location: "Nashville, TN"
+   - Example: "Bangalore, India" → location: "Bangalore, India"
+
+5. LINKS - EXTRACT ALL URLs FOUND:
+   - SCAN THE ENTIRE RESUME for ANY URLs
+   - LinkedIn: 
+     * Look for "LinkedIn" text with URL
+     * Look for linkedin.com/in/* or linkedin.com/profile/* patterns
+     * Extract FULL URL (add https:// if missing)
+     * Example: "LinkedIn: linkedin.com/in/aleksludkee" → "https://linkedin.com/in/aleksludkee"
+   - GitHub:
+     * Look for "Github" or "GitHub" text with URL
+     * Look for github.com/* patterns
+     * Extract FULL URL (add https:// if missing)
+     * Example: "Github: github.com/aleksludkee" → "https://github.com/aleksludkee"
+   - Portfolio/Personal Websites:
+     * Look for personal website URLs
+     * Look for portfolio links
+     * Extract ALL portfolio/personal website URLs
+   - Other Links:
+     * Extract ALL other URLs found: Twitter, Kaggle, Medium, Behance, Stack Overflow, personal blogs, etc.
+     * Don't miss any URLs - scan carefully
+     * Always add https:// prefix if URL doesn't have http:// or https://
+     * Store in other_links array
+
+IMPORTANT: 
+- Be THOROUGH - extract EVERY piece of contact information visible
+- Don't skip links just because they're in different sections
+- If you see "LinkedIn" or "Github" text, the URL is nearby - find it!
+- URLs might be hyperlinked (clickable) - extract the actual URL, not just the text
 
 QUALITY PRINCIPLES:
 - Prefer fewer, correct fields over noisy output
@@ -356,36 +488,57 @@ Return ONLY valid JSON. No explanations, no markdown, just JSON.
 """
         return prompt
     
-    def _parse_text_only(self, text: str) -> Dict[str, Any]:
-        """Fallback: Parse text-only using Qwen (no vision)"""
+    def _extract_with_text(self, text: str) -> Dict[str, Any]:
+        """Extract using text-only model with extracted text (better than PDF base64)"""
         try:
-            prompt = self._build_master_prompt(text)
+            prompt = self._build_master_prompt()
+            # Add the extracted text to the prompt
+            full_prompt = f"{prompt}\n\nRESUME TEXT CONTENT:\n{text}\n\nNow extract the Candidate Kundali from the above resume text."
             
             response = requests.post(
-                f"{self.ollama_endpoint}/api/generate",
+                f"{self.ollama_endpoint}/api/chat",
                 json={
                     "model": self.fallback_model,
-                    "prompt": prompt,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": full_prompt
+                        }
+                    ],
                     "stream": False,
                     "options": {
-                        "temperature": 0.1,
-                        "num_predict": 4096
+                        "temperature": 0.1,  # Low temperature for structured output
+                        "num_predict": 4096  # Enough for full kundali
                     }
                 },
-                timeout=120.0
+                timeout=300.0
             )
             
             if response.status_code == 200:
                 result = response.json()
-                generated_text = result.get("response", "")
+                generated_text = result.get("message", {}).get("content", "")
                 kundali_json = self._extract_json_from_response(generated_text)
                 kundali = json.loads(kundali_json)
+                
+                logger.info("qwen_text_extraction_successful", 
+                           model=self.fallback_model,
+                           response_length=len(generated_text))
                 return kundali
             else:
+                logger.error("ollama_text_api_error", 
+                           status_code=response.status_code,
+                           response_text=response.text[:200])
                 return self._empty_kundali()
-        except Exception as e:
-            logger.error("text_only_parsing_failed", error=str(e))
+        except json.JSONDecodeError as e:
+            logger.error("failed_to_parse_kundali_json", error=str(e))
             return self._empty_kundali()
+        except Exception as e:
+            logger.error("text_extraction_failed", error=str(e), exc_info=True)
+            return self._empty_kundali()
+    
+    def _parse_text_only(self, text: str) -> Dict[str, Any]:
+        """Fallback: Parse text-only using Qwen (no vision) - deprecated, use _extract_with_text instead"""
+        return self._extract_with_text(text)
     
     def _extract_json_from_response(self, text: str) -> str:
         """Extract JSON from model response"""

@@ -380,7 +380,18 @@ export default function CandidateDetailsModal({ isOpen, onClose, candidateId }: 
                               )}
                             </div>
                             {exp.description && (
-                              <p className="text-sm text-gray-700 mt-2">{exp.description}</p>
+                              <div className="text-sm text-gray-700 mt-2 whitespace-pre-line">
+                                {exp.description}
+                              </div>
+                            )}
+                            {exp.technologies && Array.isArray(exp.technologies) && exp.technologies.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {exp.technologies.map((tech: string, j: number) => (
+                                  <span key={j} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded">
+                                    {tech}
+                                  </span>
+                                ))}
+                              </div>
                             )}
                             {exp.location && (
                               <p className="text-xs text-gray-500 mt-1">{exp.location}</p>
