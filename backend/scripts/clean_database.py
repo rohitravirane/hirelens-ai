@@ -1,5 +1,5 @@
 """
-Clean all data except users and roles
+Clean candidates and resume data, preserve jobs and users
 """
 import sys
 from pathlib import Path
@@ -18,12 +18,12 @@ logger = structlog.get_logger()
 
 
 def clean_database():
-    """Clean all data except users and roles"""
+    """Clean candidates and resume data, preserve jobs and users"""
     db: Session = SessionLocal()
     try:
         logger.info("starting_database_cleanup")
         
-        # Delete AI Explanations
+        # Delete AI Explanations (related to matches)
         ai_explanations_count = db.query(AIExplanation).count()
         db.query(AIExplanation).delete()
         logger.info("deleted_ai_explanations", count=ai_explanations_count)
@@ -48,10 +48,9 @@ def clean_database():
         db.query(Resume).delete()
         logger.info("deleted_resumes", count=resumes_count)
         
-        # Delete Jobs
+        # Jobs are PRESERVED - not deleted
         jobs_count = db.query(JobDescription).count()
-        db.query(JobDescription).delete()
-        logger.info("deleted_jobs", count=jobs_count)
+        logger.info("preserved_jobs", count=jobs_count)
         
         db.commit()
         logger.info("database_cleanup_complete")
@@ -61,8 +60,9 @@ def clean_database():
         print(f"   - Deleted {resume_versions_count} Resume Versions")
         print(f"   - Deleted {candidates_count} Candidates")
         print(f"   - Deleted {resumes_count} Resumes")
-        print(f"   - Deleted {jobs_count} Jobs")
-        print("\n✅ Users and Roles preserved!")
+        print(f"\n✅ Preserved:")
+        print(f"   - {jobs_count} Jobs")
+        print(f"   - All Users and Roles")
         
     except Exception as e:
         logger.error("database_cleanup_failed", error=str(e))

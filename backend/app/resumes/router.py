@@ -3,6 +3,7 @@ Resume processing routes
 """
 import os
 import uuid
+import json
 from pathlib import Path
 from typing import List
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
@@ -124,6 +125,26 @@ def get_resume(
         .first()
     )
     
+    # Extract personal info from parsed_data if available
+    personal_info = {}
+    if latest_version and latest_version.parsed_data:
+        # parsed_data is stored as JSON, might be dict or string
+        parsed_data = latest_version.parsed_data
+        if isinstance(parsed_data, str):
+            try:
+                parsed_data = json.loads(parsed_data)
+            except (json.JSONDecodeError, TypeError):
+                parsed_data = {}
+        if isinstance(parsed_data, dict):
+            personal_info = {
+                "first_name": parsed_data.get("first_name") or "",
+                "last_name": parsed_data.get("last_name") or "",
+                "email": parsed_data.get("email") or "",
+                "phone": parsed_data.get("phone") or "",
+                "linkedin_url": parsed_data.get("linkedin_url") or "",
+                "portfolio_url": parsed_data.get("portfolio_url") or "",
+            }
+    
     return ResumeDetailResponse(
         id=resume.id,
         file_name=resume.file_name,
@@ -143,6 +164,7 @@ def get_resume(
             projects=latest_version.projects,
             parsed_at=latest_version.parsed_at,
             quality_score=latest_version.quality_score,
+            **personal_info,
         ) if latest_version else None,
     )
 

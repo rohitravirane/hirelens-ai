@@ -49,7 +49,15 @@ class Settings(BaseSettings):
     # Fast: "TinyLlama/TinyLlama-1.1B-Chat-v1.0" (CPU), "microsoft/phi-2" (GPU/CPU)
     HUGGINGFACE_PARSER_MODEL: str = "mistralai/Mistral-7B-Instruct-v0.1"  # Best quality for production
     USE_GPU: bool = False  # Set to True if GPU available (recommended for Mistral)
-    MODEL_DEVICE: str = "cpu"  # "cpu" or "cuda"
+    MODEL_DEVICE: str = "cpu"  # "cpu" or "cuda" - auto-detected if USE_GPU=True
+    
+    @property
+    def effective_device(self) -> str:
+        """Auto-detect device based on CUDA availability"""
+        import torch
+        if torch.cuda.is_available():
+            return "cuda"
+        return "cpu"
     # Production optimizations
     USE_QUANTIZATION: bool = True  # Use 8-bit quantization to reduce memory (recommended for production)
     # MODEL_MAX_MEMORY handled via env var parsing - use empty string or omit from .env

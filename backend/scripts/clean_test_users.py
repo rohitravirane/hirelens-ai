@@ -19,7 +19,7 @@ def clean_test_users():
     db: Session = SessionLocal()
     try:
         # Keep admin user
-        admin = db.query(User).filter(User.email == "rohitravikantrane@gmail.com").first()
+        admin = db.query(User).filter(User.email == "admin@hirelens.ai").first()
         
         if not admin:
             print("❌ Admin user not found!")

@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: hirelens_pass
       POSTGRES_DB: hirelens_db
     ports:
-      - "5433:5432"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -84,7 +84,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A app.core.celery_app worker --loglevel=info --concurrency=4
+    command: celery -A app.core.celery_app worker --loglevel=info --pool=solo
 
   celery-beat:
     build:
@@ -121,7 +121,30 @@ services:
       - /app/.next
     command: npm run dev
 
+  huridocs-layout:
+    image: ghcr.io/huridocs/pdf-document-layout-analysis:latest
+    container_name: hirelens-huridocs-layout
+    ports:
+      - "5060:5060"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=5060
+      - OCR_SOURCE=/tmp/ocr_source
+    volumes:
+      - huridocs_models:/app/models
+      - huridocs_ocr:/tmp/ocr_source
+    command: ["/bin/bash", "/app/start.sh"]
+    working_dir: /app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5060/info"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
 volumes:
   postgres_data:
   redis_data:
+  huridocs_models:
+  huridocs_ocr:
 

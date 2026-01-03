@@ -50,7 +50,7 @@ def create_default_roles(db: Session):
 
 def create_admin_user(db: Session):
     """Create default admin user"""
-    admin_email = "rohitravikantrane@gmail.com"
+    admin_email = "admin@hirelens.ai"
     admin_password = "admin123"  # Change in production!
     
     existing = db.query(User).filter(User.email == admin_email).first()
@@ -66,7 +66,7 @@ def create_admin_user(db: Session):
     admin_user = User(
         email=admin_email,
         hashed_password=get_password_hash(admin_password),
-        full_name="Rohit Rane",
+        full_name="System Administrator",
         is_active=True,
         is_verified=True,
     )

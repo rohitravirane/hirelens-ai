@@ -25,13 +25,13 @@ class HuggingFaceService:
     """Hugging Face service for local AI inference"""
     
     def __init__(self):
-        self.device = settings.MODEL_DEVICE
-        if settings.USE_GPU and torch.cuda.is_available():
+        # Force GPU if available, regardless of settings
+        if torch.cuda.is_available():
             self.device = "cuda"
             logger.info("using_gpu", device=torch.cuda.get_device_name(0))
         else:
             self.device = "cpu"
-            logger.info("using_cpu")
+            logger.warning("gpu_not_available_using_cpu")
         
         # Initialize embedding model
         self.embedding_model = None

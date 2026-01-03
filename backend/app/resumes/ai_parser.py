@@ -21,35 +21,166 @@ class AIParser:
     def __init__(self):
         self.ai_engine = ai_engine
     
-    def parse_with_ai(self, raw_text: str) -> Dict[str, Any]:
+    def parse_with_ai(self, raw_text: str, pdf_path: Optional[str] = None, force_reprocess: bool = False) -> Dict[str, Any]:
         """
-        Parse resume using AI/LLM to extract structured data
-        This is the heart of the system - intelligent extraction
+        Parse resume using Vision + Layout + Semantic hybrid approach
+        Strategy: LayoutLMv3 (vision+layout) -> Section-aware extraction -> NER (within sections) -> Optional LLM refinement
+        
+        Args:
+            raw_text: Raw text from resume
+            pdf_path: Optional path to PDF file
+            force_reprocess: If True, skip cache and reprocess
         """
         cache_key = get_cache_key("ai_parse", "resume", raw_text[:200])
-        cached = get_cache(cache_key)
-        if cached:
-            logger.info("using_cached_ai_parse")
-            return cached
+        
+        # Skip cache if force_reprocess is True
+        if not force_reprocess:
+            cached = get_cache(cache_key)
+            if cached:
+                logger.info("using_cached_ai_parse", cache_key=cache_key[:50])
+                # If we have PDF path and cache doesn't have layout metadata, try layout parsing
+                if pdf_path and not cached.get("_metadata", {}).get("parser_version") == "layout-aware-v1.0":
+                    logger.info("cache_missing_layout_metadata_trying_layout_parsing")
+                    # Don't return cached, continue to layout parsing
+                else:
+                    return cached
+        else:
+            logger.info("force_reprocess_skipping_cache")
         
         try:
-            # Use AI to extract structured data
-            if self.ai_engine.provider == "openai" and self.ai_engine.openai_client:
-                parsed_data = self._parse_with_openai(raw_text)
-            elif self.ai_engine.provider == "huggingface":
-                parsed_data = self._parse_with_huggingface(raw_text)
-            else:
-                # Fallback to rule-based
-                parsed_data = self._parse_with_rules(raw_text)
+            # STEP 1: VISION-FIRST PIPELINE (PRIMARY PATH) - MANDATORY
+            # This is the mandatory first step for production-grade parsing
+            # LayoutLMv3-large provides vision + layout + text understanding
+            if pdf_path:
+                logger.info("starting_vision_first_parsing", pdf_path=pdf_path, force_reprocess=force_reprocess)
+                try:
+                    parsed_data = self._parse_with_layout(raw_text, pdf_path)
+                    
+                    if parsed_data:
+                        metadata = parsed_data.get("_metadata", {})
+                        parser_version = metadata.get("parser_version", "")
+                        
+                        logger.info("layout_parser_returned_data", 
+                                   parser_version=parser_version,
+                                   has_metadata=bool(metadata),
+                                   used_layoutlm=metadata.get("used_layoutlm", False))
+                        
+                        # Accept layout-aware parsing if it succeeded (even if LayoutLM wasn't used due to fallback)
+                        if parser_version in ["layout-aware-v1.0", "text-fallback"]:
+                            used_layoutlm = metadata.get("used_layoutlm", False)
+                            used_text_detection = metadata.get("used_text_based_detection", False)
+                            
+                            logger.info("vision_first_parsing_complete", 
+                                       used_layoutlm=used_layoutlm,
+                                       used_text_detection=used_text_detection,
+                                       used_ocr=metadata.get("used_ocr", False),
+                                       sections=metadata.get("sections_detected", []))
+                            
+                            # Post-process: Calculate experience years
+                            parsed_data["experience_years"] = self._calculate_experience_years(parsed_data.get("experience", []))
+                            
+                            # Calculate quality score (higher weight for LayoutLM success)
+                            quality_score = self._calculate_quality_score(parsed_data, raw_text, used_layoutlm=used_layoutlm)
+                            parsed_data["quality_score"] = quality_score
+                            logger.info("vision_first_quality_score", score=quality_score, used_layoutlm=used_layoutlm)
+                            
+                            # Only proceed to NER merge if quality is acceptable or LayoutLM was used
+                            # If LayoutLM was used, trust the vision-first result
+                            if used_layoutlm or quality_score >= 60:
+                                # Merge with NER for enhanced accuracy (skills, entities within sections)
+                                try:
+                                    from app.resumes.ner_parser import NERParser
+                                    ner_parser = NERParser()
+                                    ner_data = ner_parser.parse_with_ner(raw_text, pdf_path)
+                                    
+                                    # Enhance with NER insights (union of skills, validate entities)
+                                    layout_skills = parsed_data.get("skills", {}).get("technical", [])
+                                    if isinstance(layout_skills, list):
+                                        ner_skills = ner_data.get("skills", [])
+                                        if isinstance(ner_skills, list):
+                                            all_skills = list(set(layout_skills + ner_skills))
+                                            parsed_data["skills"]["technical"] = all_skills
+                                            logger.info("ner_skills_merged", total_skills=len(all_skills))
+                                    
+                                    # Merge experience if layout parsing missed some
+                                    if not parsed_data.get("experience") and ner_data.get("experience"):
+                                        parsed_data["experience"] = ner_data.get("experience")
+                                        logger.info("ner_experience_merged")
+                                    
+                                    # Merge education if missing
+                                    if not parsed_data.get("education") and ner_data.get("education"):
+                                        parsed_data["education"] = ner_data.get("education")
+                                        logger.info("ner_education_merged")
+                                    
+                                except Exception as merge_error:
+                                    logger.warning("ner_merge_failed", error=str(merge_error))
+                            
+                            # Cache and return vision-first result
+                            set_cache(cache_key, parsed_data, ttl=3600 * 24)
+                            return parsed_data
+                        else:
+                            logger.warning("layout_parsing_unexpected_version", 
+                                         parser_version=parser_version,
+                                         metadata_keys=list(metadata.keys()) if metadata else [])
+                            # Still use the data if it has content, even if version is unexpected
+                            if parsed_data.get("skills") or parsed_data.get("experience"):
+                                logger.info("using_layout_data_despite_version_mismatch")
+                                parsed_data["experience_years"] = self._calculate_experience_years(parsed_data.get("experience", []))
+                                quality_score = self._calculate_quality_score(parsed_data, raw_text, used_layoutlm=metadata.get("used_layoutlm", False))
+                                parsed_data["quality_score"] = quality_score
+                                set_cache(cache_key, parsed_data, ttl=3600 * 24)
+                                return parsed_data
+                    else:
+                        logger.warning("layout_parsing_returned_empty", pdf_path=pdf_path)
+                except ImportError as e:
+                    logger.error("layout_parser_import_failed", error=str(e), exc_info=True)
+                    # Layout parser not available - fallback to NER
+                except Exception as e:
+                    logger.error("vision_first_parsing_failed", 
+                               error=str(e), 
+                               error_type=type(e).__name__,
+                               exc_info=True)
+                    # Continue to NER fallback
             
-            # Post-process: Calculate experience years from date ranges
+            # STEP 2: FALLBACK - NER-based parsing (only if vision-first failed or no PDF)
+            # This is now the fallback path, not primary
+            logger.info("using_ner_based_parsing_fallback", has_pdf_path=bool(pdf_path))
+            parsed_data = self._parse_with_ner(raw_text, pdf_path)
+            
+            # Step 2: Post-process: Calculate experience years
             parsed_data["experience_years"] = self._calculate_experience_years(parsed_data.get("experience", []))
             
-            # Calculate quality score if not already calculated
-            if "quality_score" not in parsed_data or parsed_data.get("quality_score") is None:
-                quality_score = self._calculate_quality_score(parsed_data, raw_text)
-                parsed_data["quality_score"] = quality_score
-                logger.info("quality_score_calculated", score=quality_score)
+            # Step 3: Calculate quality score
+            quality_score = self._calculate_quality_score(parsed_data, raw_text)
+            parsed_data["quality_score"] = quality_score
+            logger.info("ner_quality_score_calculated", score=quality_score)
+            
+            # Step 4: Optional LLM refinement (only if quality is low or OpenAI is available)
+            # Skip LLM on CPU for HuggingFace (too slow), use OpenAI if available
+            use_llm_refinement = (
+                quality_score < 70 and  # Low quality - needs refinement
+                self.ai_engine.provider == "openai" and 
+                self.ai_engine.openai_client
+            )
+            
+            if use_llm_refinement:
+                logger.info("applying_llm_refinement", quality_score=quality_score)
+                try:
+                    refined_data = self._parse_with_openai(raw_text)
+                    refined_score = refined_data.get("quality_score", 0)
+                    # Use refined data if it's significantly better
+                    if refined_score > quality_score + 10:
+                        logger.info("llm_refinement_improved", 
+                                   old_score=quality_score, 
+                                   new_score=refined_score)
+                        parsed_data = refined_data
+                    else:
+                        logger.info("llm_refinement_no_improvement", 
+                                   ner_score=quality_score, 
+                                   llm_score=refined_score)
+                except Exception as e:
+                    logger.warning("llm_refinement_failed", error=str(e))
+                    # Continue with NER result
             
             # Cache the result
             set_cache(cache_key, parsed_data, ttl=3600 * 24)  # Cache for 24 hours
@@ -57,15 +188,91 @@ class AIParser:
             return parsed_data
             
         except Exception as e:
-            logger.error("ai_parsing_failed", error=str(e))
+            logger.error("ner_parsing_failed", error=str(e), exc_info=True)
             # Fallback to rule-based parsing
             parsed_data = self._parse_with_rules(raw_text)
-            # Calculate quality score for fallback parsing too
             parsed_data["experience_years"] = self._calculate_experience_years(parsed_data.get("experience", []))
             quality_score = self._calculate_quality_score(parsed_data, raw_text)
             parsed_data["quality_score"] = quality_score
             logger.info("fallback_quality_score_calculated", score=quality_score)
             return parsed_data
+    
+    def _parse_with_layout(self, text: str, pdf_path: str) -> Dict[str, Any]:
+        """
+        Parse resume using layout-aware pipeline (LayoutLMv3 + Section Detection + Semantic Normalization)
+        This is the new primary method for complex resumes
+        """
+        logger.info("_parse_with_layout_called", pdf_path=pdf_path, text_length=len(text) if text else 0)
+        try:
+            from app.resumes.layout_parser import LayoutParser
+            logger.info("layout_parser_imported_successfully")
+            layout_parser = LayoutParser()
+            logger.info("layout_parser_initialized", pdf_path=pdf_path)
+            parsed_data = layout_parser.parse(pdf_path, text_from_pdf=text)
+            logger.info("layout_parser_parse_completed", 
+                       has_data=bool(parsed_data),
+                       parser_version=parsed_data.get("_metadata", {}).get("parser_version", "unknown") if parsed_data else "none",
+                       has_experience=bool(parsed_data.get("experience")) if parsed_data else False,
+                       has_skills=bool(parsed_data.get("skills")) if parsed_data else False)
+            
+            if not parsed_data:
+                logger.warning("layout_parser_returned_none", pdf_path=pdf_path)
+                return None
+            
+            # Merge with NER parsing for enhanced accuracy within sections
+            # This gives us the best of both worlds: layout understanding + NER precision
+            try:
+                from app.resumes.ner_parser import NERParser
+                ner_parser = NERParser()
+                ner_data = ner_parser.parse_with_ner(text, pdf_path)
+                
+                # Enhance parsed_data with NER insights
+                # Merge skills (union)
+                layout_skills = parsed_data.get("skills", {}).get("technical", [])
+                ner_skills = ner_data.get("skills", [])
+                if isinstance(layout_skills, list) and isinstance(ner_skills, list):
+                    all_skills = list(set(layout_skills + ner_skills))
+                    parsed_data["skills"]["technical"] = all_skills
+                
+                # Merge experience (prefer layout if available, else NER)
+                if not parsed_data.get("experience") and ner_data.get("experience"):
+                    parsed_data["experience"] = ner_data.get("experience")
+                
+                # Merge education
+                if not parsed_data.get("education") and ner_data.get("education"):
+                    parsed_data["education"] = ner_data.get("education")
+                
+                logger.info("layout_ner_merge_complete")
+            except Exception as e:
+                logger.warning("ner_merge_failed", error=str(e))
+            
+            return parsed_data
+        except ImportError as e:
+            logger.error("layout_parser_import_failed_in_method", error=str(e), exc_info=True)
+            return None
+        except Exception as e:
+            logger.error("layout_parsing_failed", 
+                        error=str(e), 
+                        error_type=type(e).__name__,
+                        exc_info=True)
+            return None
+    
+    def _parse_with_ner(self, text: str, pdf_path: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Parse resume using NER-based extraction (fast, accurate)
+        This is the fallback parsing method - much faster than LLMs
+        Uses HURIDOCS layout analysis if PDF path provided
+        """
+        try:
+            from app.resumes.ner_parser import NERParser
+            ner_parser = NERParser()
+            parsed_data = ner_parser.parse_with_ner(text, pdf_path)
+            logger.info("ner_parsing_success")
+            return parsed_data
+        except Exception as e:
+            logger.warning("ner_parser_not_available", error=str(e))
+            # Fallback to rule-based
+            return self._parse_with_rules(text)
     
     def _parse_with_openai(self, text: str) -> Dict[str, Any]:
         """Parse resume using OpenAI GPT with world-class extraction"""
@@ -183,20 +390,38 @@ IMPORTANT:
         """
         Parse resume using HuggingFace models for world-class extraction
         Uses advanced document understanding models from Hugging Face Hub
+        
+        Note: Large models like Mistral-7B are very slow on CPU. For CPU-only systems,
+        we skip AI parsing and use rule-based parsing for faster processing.
         """
+        # Skip AI parsing on CPU for large models - they're too slow (15+ minutes)
+        # Use GPU or OpenAI API for better quality AI parsing
+        device = settings.MODEL_DEVICE
+        if not settings.USE_GPU and device == "cpu":
+            logger.info("skipping_ai_parsing_on_cpu", 
+                       reason="Large models too slow on CPU, using rule-based for faster processing",
+                       model=settings.HUGGINGFACE_PARSER_MODEL)
+            return self._parse_with_rules(text)
+        
         try:
-            # Try using specialized Hugging Face PDF parser
+            # Try using specialized Hugging Face PDF parser (only if GPU available)
+            logger.info("attempting_hf_pdf_parser", model=settings.HUGGINGFACE_PARSER_MODEL, device=device)
             from app.resumes.hf_pdf_parser import hf_pdf_parser
             parsed_data = hf_pdf_parser.parse_resume(text)
-            if parsed_data:
-                logger.info("hf_pdf_parser_success")
+            if parsed_data and parsed_data.get("quality_score", 0) > 0:
+                logger.info("hf_pdf_parser_success", quality_score=parsed_data.get("quality_score"))
                 return parsed_data
-        except ImportError:
-            logger.warning("hf_pdf_parser_not_available")
+            else:
+                logger.warning("hf_pdf_parser_returned_empty_or_low_quality", 
+                            has_data=bool(parsed_data),
+                            quality_score=parsed_data.get("quality_score") if parsed_data else None)
+        except ImportError as e:
+            logger.warning("hf_pdf_parser_not_available", error=str(e), exc_info=True)
         except Exception as e:
-            logger.warning("huggingface_parsing_failed", error=str(e))
+            logger.error("huggingface_parsing_failed", error=str(e), exc_info=True)
         
         # Fallback to rule-based
+        logger.warning("falling_back_to_rule_based_parsing")
         return self._parse_with_rules(text)
     
     def _parse_with_rules(self, text: str) -> Dict[str, Any]:
@@ -366,7 +591,7 @@ IMPORTANT:
         
         return date_str  # Return as-is if can't parse
     
-    def _calculate_quality_score(self, parsed_data: Dict[str, Any], raw_text: str) -> int:
+    def _calculate_quality_score(self, parsed_data: Dict[str, Any], raw_text: str, used_layoutlm: bool = False) -> int:
         """
         Calculate quality score (0-100) for parsed resume data
         This is critical for determining if reprocessing is needed
@@ -433,6 +658,28 @@ IMPORTANT:
         ])
         if categories_with_data >= 3:
             score += 5
+        
+        # Layout confidence scoring (15 points)
+        # VISION-FIRST architecture: LayoutLM success significantly boosts quality
+        metadata = parsed_data.get("_metadata", {})
+        if used_layoutlm and metadata.get("used_layoutlm"):
+            # LayoutLM was successfully used - highest confidence
+            score += 15
+            logger.info("layoutlm_bonus_applied", bonus=15)
+        elif metadata.get("used_text_based_detection"):
+            # Text-based section detection (still layout-aware via position)
+            score += 8
+            logger.info("text_based_layout_bonus_applied", bonus=8)
+        
+        # Penalize fallback usage (indicates layout parsing failed)
+        if metadata.get("parser_version") == "text-fallback":
+            score = max(0, score - 20)  # Strong penalty for fallback
+            logger.warning("fallback_penalty_applied", penalty=20)
+        
+        # OCR usage bonus (scanned PDFs are harder but handled correctly)
+        if metadata.get("used_ocr"):
+            # OCR was used successfully - don't penalize, it's correct handling
+            logger.info("ocr_used_quality_maintained")
         
         return min(score, max_score)
 

@@ -146,10 +146,55 @@ export default function DashboardPage() {
     }
   }
 
-  const handleResumeUploadSuccess = (resumeId: number) => {
+  const showNotification = (message: string, type: 'success' | 'error') => {
+    setNotification({ message, type })
+    setTimeout(() => setNotification(null), 5000)
+  }
+
+  const handleResumeUploadSuccess = async (resumeId: number) => {
     setSelectedResumeId(resumeId)
     setShowResumeModal(false)
-    setShowCandidateModal(true)
+    
+    // Show notification that processing has started
+    showNotification('Resume uploaded! Processing in progress...', 'success')
+    
+    // Wait for processing to complete before showing candidate form
+    let checkCount = 0
+    const maxChecks = 60 // Maximum 2 minutes (60 * 2 seconds)
+    
+    const checkProcessingStatus = async () => {
+      try {
+        checkCount++
+        const response = await api.get(`/api/v1/resumes/${resumeId}`)
+        const status = response.data.processing_status
+        
+        if (status === 'completed') {
+          // Processing complete, now show candidate form
+          showNotification('Resume processed successfully!', 'success')
+          setShowCandidateModal(true)
+        } else if (status === 'failed') {
+          // Processing failed, show error
+          showNotification('Resume processing failed. Please try again.', 'error')
+        } else if (checkCount >= maxChecks) {
+          // Timeout - processing taking too long
+          showNotification('Processing is taking longer than expected. You can add candidate manually later.', 'error')
+        } else {
+          // Still processing, check again after 2 seconds
+          setTimeout(checkProcessingStatus, 2000)
+        }
+      } catch (err) {
+        console.error('Failed to check processing status', err)
+        if (checkCount >= maxChecks) {
+          showNotification('Unable to check processing status. You can add candidate manually later.', 'error')
+        } else {
+          // On error, check again
+          setTimeout(checkProcessingStatus, 2000)
+        }
+      }
+    }
+    
+    // Start checking status after a short delay
+    setTimeout(checkProcessingStatus, 2000)
   }
 
   return (

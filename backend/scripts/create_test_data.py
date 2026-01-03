@@ -64,7 +64,7 @@ EDUCATION_FIELDS = ["Computer Science", "Software Engineering", "Information Tec
 
 def create_test_users(db: Session):
     """Create test users with different roles"""
-    admin = db.query(User).filter(User.email == "rohitravikantrane@gmail.com").first()
+    admin = db.query(User).filter(User.email == "admin@hirelens.ai").first()
     if not admin:
         logger.warning("admin_user_not_found")
         return None

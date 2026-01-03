@@ -37,6 +37,13 @@ class ResumeVersionResponse(BaseModel):
     projects: Optional[List[Dict[str, Any]]]
     parsed_at: datetime
     quality_score: Optional[int]  # Quality score 0-100
+    # Personal information extracted from resume
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    portfolio_url: Optional[str] = None
     
     class Config:
         from_attributes = True

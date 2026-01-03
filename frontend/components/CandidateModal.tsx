@@ -31,6 +31,7 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
       fetchResumes()
       if (resumeId) {
         setFormData(prev => ({ ...prev, resume_id: resumeId }))
+        fetchResumePersonalInfo(resumeId)
       }
     }
   }, [isOpen, resumeId])
@@ -41,6 +42,27 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
       setResumes(response.data)
     } catch (err) {
       console.error('Failed to fetch resumes', err)
+    }
+  }
+
+  const fetchResumePersonalInfo = async (id: number) => {
+    try {
+      const response = await api.get(`/api/v1/resumes/${id}`)
+      const latestVersion = response.data.latest_version
+      if (latestVersion) {
+        setFormData(prev => ({
+          ...prev,
+          first_name: latestVersion.first_name || prev.first_name,
+          last_name: latestVersion.last_name || prev.last_name,
+          email: latestVersion.email || prev.email,
+          phone: latestVersion.phone || prev.phone,
+          linkedin_url: latestVersion.linkedin_url || prev.linkedin_url,
+          portfolio_url: latestVersion.portfolio_url || prev.portfolio_url,
+        }))
+      }
+    } catch (err) {
+      console.error('Failed to fetch resume personal info', err)
+      // Don't show error to user, just silently fail
     }
   }
 
