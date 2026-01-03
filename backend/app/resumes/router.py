@@ -145,6 +145,11 @@ def get_resume(
                 "portfolio_url": parsed_data.get("portfolio_url") or "",
             }
     
+    # Normalize skills format (dict to list) if needed
+    normalized_skills = None
+    if latest_version and latest_version.skills:
+        normalized_skills = ResumeVersionResponse.normalize_skills(latest_version.skills)
+    
     return ResumeDetailResponse(
         id=resume.id,
         file_name=resume.file_name,
@@ -157,7 +162,7 @@ def get_resume(
             id=latest_version.id,
             resume_id=latest_version.resume_id,
             version_number=latest_version.version_number,
-            skills=latest_version.skills,
+            skills=normalized_skills,
             experience_years=latest_version.experience_years,
             education=latest_version.education,
             experience=latest_version.experience,

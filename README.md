@@ -10,9 +10,11 @@ HireLens AI is not a demo or tutorial project. It's a **real-world, enterprise-g
 
 ### Core Capabilities
 
-- ✅ **Vision-First Document AI System**: Enterprise-grade resume parsing using LayoutLMv3-large with GPU acceleration
-- ✅ **AI-Powered Resume Parsing**: Intelligent extraction of structured data from PDF/DOCX resumes using vision + layout + semantic understanding
-- ✅ **Ollama Integration**: Fast semantic normalization using pre-downloaded local LLM models (Qwen2.5-7B)
+- ✅ **Candidate Kundali System**: 360° technical + professional + behavioral profile extraction
+- ✅ **Qwen Vision-Based Parsing**: Image-first extraction using local Qwen2.5-VL model (100% offline)
+- ✅ **Personality Inference**: Work style, ownership level, learning orientation, communication strength (with confidence scores)
+- ✅ **Resume-as-Source-of-Truth**: No manual forms, resume is the ONLY input
+- ✅ **Ollama Integration**: Fast inference using pre-downloaded local Qwen models (Qwen2.5-VL for vision)
 - ✅ **Experience Calculation**: Accurate years of experience calculation from resume date ranges with overlap handling
 - ✅ **Job Description Intelligence**: Parse and understand job requirements with comprehensive descriptions
 - ✅ **Semantic Matching**: AI-powered candidate-job matching with embeddings
@@ -38,7 +40,7 @@ Frontend (Next.js) → API Gateway (FastAPI) → Services → Database (PostgreS
                                                           ↓
                                                     Celery Workers (Async Tasks)
                                                           ↓
-                                    Vision-First Document AI (LayoutLMv3-large + Ollama)
+                                    Candidate Kundali Engine (Qwen Vision + Ollama)
 ```
 
 ### Architecture Style
@@ -50,12 +52,18 @@ Frontend (Next.js) → API Gateway (FastAPI) → Services → Database (PostgreS
 
 ### Prerequisites
 
-- Docker & Docker Compose
-- Python 3.11+ (for local development)
-- Node.js 18+ (for frontend development)
-- **NVIDIA GPU (Highly Recommended)** - GPU with 8GB+ VRAM (RTX series or equivalent) for faster AI model inference. CUDA-enabled GPU with Docker GPU support.
-- **Ollama (Optional but Recommended)** - For fast semantic normalization using pre-downloaded Qwen models. Install from [ollama.ai](https://ollama.ai)
+- **Docker & Docker Compose** - Works on Windows 11, macOS, and Linux
+- **Python 3.11+** (for local development, optional if using Docker)
+- **Node.js 18+** (for frontend development, optional if using Docker)
+- **NVIDIA GPU (Highly Recommended)** - GPU with 8GB+ VRAM (RTX series or equivalent) for faster AI model inference
+  - **Windows 11**: Requires Docker Desktop with WSL2 backend for GPU support
+  - **Linux**: nvidia-docker or Docker with GPU support
+- **Ollama (Optional but Recommended)** - For fast semantic normalization using pre-downloaded Qwen models
+  - **Windows**: Install Windows version from [ollama.ai](https://ollama.ai)
+  - **Linux/WSL**: Install via package manager or script
 - **OpenAI API Key (Optional)** - Only needed if using OpenAI. Hugging Face + Ollama works locally without API!
+
+**Note**: Project works on **Windows 11 directly** (no WSL required for basic setup). WSL2 is only recommended for GPU support.
 
 ### Using Docker Compose (Recommended)
 
@@ -90,13 +98,17 @@ Frontend (Next.js) → API Gateway (FastAPI) → Services → Database (PostgreS
    docker-compose exec backend python scripts/init_db.py
    ```
 
-6. **Check logs (if issues)**
-   ```bash
-   # Backend logs
-   docker-compose logs -f backend
+6. **Check logs**
+   ```powershell
+   # Check all logs (recommended)
+   .\scripts\check_logs.ps1
    
-   # Celery worker logs
-   docker-compose logs -f celery-worker
+   # Check specific service with more lines
+   .\scripts\check_logs.ps1 -Service backend -Lines 100
+   
+   # Or use docker directly
+   docker-compose logs -f backend
+   docker-compose logs -f hirelens-celery-worker
    
    # Clear resume cache if needed (after code changes)
    docker-compose exec backend python scripts/clear_resume_cache.py
@@ -212,69 +224,81 @@ curl -H "Authorization: Bearer <token>" http://localhost:8000/api/v1/jobs/
 
 ## 📊 Core Features
 
-### 1. World-Class AI-Powered Resume Processing
+### 1. Candidate Kundali: Resume-as-Source-of-Truth
 
-Upload resumes (PDF/DOCX) and extract using advanced AI:
-- **Skills**: Comprehensive technical and soft skills extraction
-- **Experience**: Years of experience calculated from date ranges (handles overlapping periods intelligently)
-- **Education**: Degrees, institutions, graduation dates, fields of study
-- **Projects**: Project descriptions, technologies, and URLs
-- **Certifications**: Professional certifications and licenses
-- **Languages**: Programming and spoken languages
+**Philosophy**: A resume is not just a document—it's a **structured signal + behavioral signal** that reveals the human behind it.
 
-**Vision-First Document AI System (PRIMARY ARCHITECTURE):**
+**What is a Candidate Kundali?**
+A 360° technical + professional + behavioral snapshot that includes:
+- **Identity**: Name, contact, location
+- **Online Presence**: ALL links (GitHub, LinkedIn, portfolio, Twitter, Kaggle, Medium, etc.)
+- **Education**: Structured timeline with fields of study
+- **Experience**: Deep extraction (technologies, quantified impact, promotions)
+- **Projects**: Personal vs company projects, ownership indicators
+- **Skills**: Categorized (Frontend, Backend, Data, DevOps, AI/ML, Tools, Soft Skills)
+- **Certifications & Achievements**
+- **Languages**: Spoken languages
+- **Seniority Assessment**: Junior/Mid/Senior/Staff+ with evidence-based reasoning
+- **Personality Inference**: Work style, ownership level, learning orientation, communication strength, risk profile (INFERRED, not facts)
+- **Leadership Signals**: Evidence-based indicators
+- **Red Flags**: Honest concerns (gaps, inconsistencies)
+- **Overall Confidence**: 0.0-1.0 based on data completeness
 
-The system uses a **production-grade vision-first architecture** comparable to FAANG internal tools:
+**Qwen Vision-Based Architecture (v2.0 - Masterpiece):**
+
+The system uses a **simplified, intelligent architecture** that prioritizes understanding over complexity:
 
 **Pipeline Flow:**
-1. **PDF Analysis**: Detect if PDF has text layer or is scanned
-2. **Image Rendering**: Convert PDF pages to images (200 DPI) for vision processing
-3. **OCR (Conditional)**: PyTesseract OCR only if PDF has no text layer (100% offline)
-4. **LayoutLMv3-Large Inference** (PRIMARY):
-   - **GPU-Accelerated**: Auto-detects CUDA (GPU with 8GB+ VRAM recommended)
-   - **CPU Fallback**: Automatic fallback if GPU unavailable
-   - **Vision + Layout + Text**: Triple understanding of document structure
-   - **Bounding-Box Aware**: Tokenization with spatial coordinates
-   - **Safetensors**: Secure model loading (PyTorch 2.5.1+cu121)
-   - **Dtype Matching**: Automatic float16/float32 matching for GPU/CPU
-5. **Layout Structure Analysis**:
-   - **Column Segmentation**: 2-column resume handling with x-axis clustering
-   - **Visual Hierarchy**: Font size + position + casing for header detection
-   - **Section Boundaries**: First-class section detection (not heuristic)
-   - **Table/Grid Awareness**: Matrix parsing for skills tables
-   - **Bullet Clusters**: Semantic unit reconstruction
-6. **Section-Aware NER**: spaCy NER within each detected section (not global)
-7. **Semantic Normalization** (Ollama or Hugging Face):
-   - **Ollama (Recommended)**: Fast inference using pre-downloaded Qwen2.5-7B-Instruct
-     - Connects to `host.docker.internal:11434` (Docker Desktop)
-     - Uses `qwen2.5:7b-instruct-q4_K_M` model
-     - No model downloads in container
-     - 10-20x faster than Hugging Face
-   - **Hugging Face (Fallback)**: Downloads Qwen2.5-7B-Instruct on first use
-     - Works offline after download
-     - Slower but fully functional
-8. **Quality Confidence**: Layout confidence incorporated into quality scoring
+1. **PDF → Direct Processing**: PDF file read directly as binary (no conversion, no text extraction)
+   - Preserves original PDF format and structure
+   - No conversion overhead or data loss
+2. **Qwen Model** (PRIMARY):
+   - **Model**: Qwen2.5-VL (vision-capable) or Qwen2.5 (text-only, fallback)
+   - **Integration**: Via Ollama (if available) or direct HuggingFace
+   - **Input**: PDF file (base64 encoded) + master extraction prompt
+   - **GPU Preferred**: Auto-detects CUDA (8GB+ VRAM recommended)
+   - **CPU Fallback**: Fully functional, slower but acceptable
+3. **Master Extraction Prompt**:
+   - **Structured Extraction**: Facts (identity, experience, skills, etc.)
+   - **Behavioral Inference**: Personality traits, work style, ownership signals
+   - **Confidence Scores**: Every inference has confidence (0.0-1.0)
+   - **Anti-Hallucination**: "unknown" for missing data, never invent
+4. **Candidate Kundali Generation**:
+   - **Structured Data**: Identity, experience, education, projects, skills
+   - **Personality Profile**: Work style, ownership, learning, communication, risk profile
+   - **Seniority Assessment**: Evidence-based (years, roles, responsibilities)
+   - **Quality Scoring**: Based on data completeness and clarity
+5. **Post-Processing & Validation**:
+   - Normalize online presence URLs
+   - Calculate experience years
+   - Validate confidence scores
+   - Store in CandidateKundali table
 
 **Key Features:**
-- ✅ **Handles ANY Resume Layout**: Multi-column, Canva/Figma designs, Indian/US formats, tables, grids, bullet clusters
-- ✅ **GPU Acceleration**: GPU with 8GB+ VRAM recommended for optimal performance
-- ✅ **100% Offline**: No API calls, all models run locally
-- ✅ **Production-Grade**: Comparable to FAANG internal document AI tools
-- ✅ **Intelligent Fallbacks**: Graceful degradation if components unavailable
-- ✅ **Quality Scoring**: Automatic quality score (0-100) with layout confidence bonuses
+- ✅ **PDF-First Extraction**: Direct PDF processing (no conversion, no text extraction)
+- ✅ **Personality Inference**: Understands work style, ownership, learning orientation (with confidence)
+- ✅ **100% Offline**: No API calls, all models run locally (Qwen via Ollama)
+- ✅ **Unlimited Usage**: No rate limits, no costs, complete privacy
+- ✅ **Resume-Only Input**: No manual forms, resume is the source of truth
+- ✅ **Confidence Scores**: Every inference has confidence (honesty over completeness)
+- ✅ **GPU/CPU Fallback**: Works on both, GPU preferred for speed
 
 **Quality Scoring System:**
-- **+15 bonus points** when LayoutLMv3-large successfully used (vision-first success)
-- **+8 bonus points** when text-based section detection used (still layout-aware)
-- **-20 penalty** when fallback to text-only parsing (layout parsing failed)
-- **80-100%**: Excellent quality, ready for matching
-- **50-79%**: Moderate quality, reprocessing recommended
-- **<50%**: Poor quality, reprocessing required
+- **Overall Confidence Score**: 0.0-1.0 based on data completeness
+- **Identity Completeness**: Name, email, phone, location (2 points)
+- **Experience Depth**: Number of entries, details, metrics (3 points)
+- **Education Completeness**: Degrees, institutions, timelines (1 point)
+- **Skills Coverage**: Categorized skills across all categories (2 points)
+- **Projects Detail**: Personal vs company, ownership indicators (1 point)
+- **Personality Confidence**: Inference quality and evidence (1 point)
+- **0.8-1.0**: Excellent quality, ready for matching
+- **0.5-0.79**: Moderate quality, acceptable
+- **<0.5**: Low quality, reprocessing recommended
 
 **Fallback Chain:**
-1. LayoutLMv3-large (GPU) → LayoutLMv3-base (GPU) → LayoutLMv3-base (CPU)
-2. Ollama Qwen → Hugging Face Qwen → Rule-based normalization
-3. Section-aware NER → Global NER → Text extraction
+1. Qwen2.5-VL (Vision) via Ollama → Qwen2.5-VL (Vision) via HuggingFace
+2. Qwen2.5 (Text-only) via Ollama → Qwen2.5 (Text-only) via HuggingFace
+3. Legacy AI Parser (LayoutLM + NER) → Rule-based parsing
 
 **API Example:**
 ```bash

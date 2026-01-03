@@ -38,4 +38,5 @@ class Candidate(Base):
     resume = relationship("Resume", back_populates="candidate")
     created_by_user = relationship("User", back_populates="created_candidates")
     match_results = relationship("MatchResult", back_populates="candidate")
+    kundali = relationship("CandidateKundali", back_populates="candidate", uselist=False)
 

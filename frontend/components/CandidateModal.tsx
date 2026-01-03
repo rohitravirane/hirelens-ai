@@ -14,6 +14,7 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [resumes, setResumes] = useState<any[]>([])
+  const [loadingResumeData, setLoadingResumeData] = useState(false)
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -31,7 +32,9 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
       fetchResumes()
       if (resumeId) {
         setFormData(prev => ({ ...prev, resume_id: resumeId }))
-        fetchResumePersonalInfo(resumeId)
+        // Retry fetching personal info with exponential backoff
+        // This handles cases where processing just completed
+        fetchResumePersonalInfoWithRetry(resumeId)
       }
     }
   }, [isOpen, resumeId])
@@ -45,11 +48,20 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
     }
   }
 
-  const fetchResumePersonalInfo = async (id: number) => {
+  const fetchResumePersonalInfoWithRetry = async (id: number, retryCount = 0) => {
+    const maxRetries = 5
+    const retryDelay = 1000 * Math.pow(2, retryCount) // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+    
+    if (retryCount === 0) {
+      setLoadingResumeData(true)
+    }
+    
     try {
       const response = await api.get(`/api/v1/resumes/${id}`)
       const latestVersion = response.data.latest_version
-      if (latestVersion) {
+      
+      if (latestVersion && (latestVersion.first_name || latestVersion.email)) {
+        // Data is available, populate form
         setFormData(prev => ({
           ...prev,
           first_name: latestVersion.first_name || prev.first_name,
@@ -59,11 +71,30 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
           linkedin_url: latestVersion.linkedin_url || prev.linkedin_url,
           portfolio_url: latestVersion.portfolio_url || prev.portfolio_url,
         }))
+        setLoadingResumeData(false)
+      } else if (retryCount < maxRetries) {
+        // Data not ready yet, retry after delay
+        setTimeout(() => {
+          fetchResumePersonalInfoWithRetry(id, retryCount + 1)
+        }, retryDelay)
+      } else {
+        setLoadingResumeData(false)
       }
     } catch (err) {
       console.error('Failed to fetch resume personal info', err)
-      // Don't show error to user, just silently fail
+      // Retry on error if we haven't exceeded max retries
+      if (retryCount < maxRetries) {
+        setTimeout(() => {
+          fetchResumePersonalInfoWithRetry(id, retryCount + 1)
+        }, retryDelay)
+      } else {
+        setLoadingResumeData(false)
+      }
     }
+  }
+
+  const fetchResumePersonalInfo = async (id: number) => {
+    fetchResumePersonalInfoWithRetry(id)
   }
 
   if (!isOpen) return null
@@ -116,6 +147,16 @@ export default function CandidateModal({ isOpen, onClose, resumeId }: CandidateM
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
               {error}
+            </div>
+          )}
+
+          {loadingResumeData && resumeId && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-700 text-sm flex items-center space-x-2">
+              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647A7.962 7.962 0 0112 20c4.418 0 8-3.582 8-8h-4a4 4 0 11-8 0v4z"></path>
+              </svg>
+              <span>Loading extracted data from resume...</span>
             </div>
           )}
 

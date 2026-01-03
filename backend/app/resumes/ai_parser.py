@@ -3,6 +3,7 @@ AI-powered resume parser using LLM for intelligent extraction
 """
 from typing import Dict, List, Any, Optional
 from datetime import datetime, date
+from pathlib import Path
 import re
 import json
 import structlog
@@ -51,6 +52,12 @@ class AIParser:
             # STEP 1: VISION-FIRST PIPELINE (PRIMARY PATH) - MANDATORY
             # This is the mandatory first step for production-grade parsing
             # LayoutLMv3-large provides vision + layout + text understanding
+            logger.info("ai_parser_parse_with_ai_called", 
+                       has_pdf_path=bool(pdf_path),
+                       pdf_path=pdf_path if pdf_path else None,
+                       text_length=len(raw_text) if raw_text else 0,
+                       force_reprocess=force_reprocess)
+            
             if pdf_path:
                 logger.info("starting_vision_first_parsing", pdf_path=pdf_path, force_reprocess=force_reprocess)
                 try:
@@ -103,9 +110,31 @@ class AIParser:
                                             logger.info("ner_skills_merged", total_skills=len(all_skills))
                                     
                                     # Merge experience if layout parsing missed some
-                                    if not parsed_data.get("experience") and ner_data.get("experience"):
-                                        parsed_data["experience"] = ner_data.get("experience")
-                                        logger.info("ner_experience_merged")
+                                    # BUT: Only merge if layout parser has NO experience entries
+                                    # AND: Filter out education entries from NER results
+                                    layout_experience = parsed_data.get("experience", [])
+                                    ner_experience = ner_data.get("experience", [])
+                                    
+                                    if not layout_experience and ner_experience:
+                                        # Filter out education entries from NER experience
+                                        filtered_ner_experience = []
+                                        for exp in ner_experience:
+                                            company = exp.get("company", "").upper() if exp.get("company") else ""
+                                            # Skip if company is an educational institution
+                                            if not any(word in company for word in ["UNIVERSITY", "COLLEGE", "INSTITUTE", "SCHOOL", "ACADEMY"]):
+                                                filtered_ner_experience.append(exp)
+                                            else:
+                                                logger.info("filtered_education_from_ner_experience", company=exp.get("company"))
+                                        
+                                        if filtered_ner_experience:
+                                            parsed_data["experience"] = filtered_ner_experience
+                                            logger.info("ner_experience_merged_filtered", count=len(filtered_ner_experience))
+                                    elif layout_experience and ner_experience:
+                                        # Layout parser has experience, but check if NER has better dates
+                                        # Only merge if layout experience has missing/wrong dates
+                                        logger.info("layout_experience_exists_checking_ner_for_improvements", 
+                                                   layout_count=len(layout_experience),
+                                                   ner_count=len(ner_experience))
                                     
                                     # Merge education if missing
                                     if not parsed_data.get("education") and ner_data.get("education"):
@@ -132,6 +161,16 @@ class AIParser:
                                 return parsed_data
                     else:
                         logger.warning("layout_parsing_returned_empty", pdf_path=pdf_path)
+                        # Even if empty, check if we should still use it
+                        if parsed_data and parsed_data.get("_metadata", {}).get("parser_version") == "layout-aware-v1.0":
+                            # Use it even if empty - it's still layout-aware parsing
+                            logger.info("using_empty_layout_aware_result")
+                            used_layoutlm = parsed_data.get("_metadata", {}).get("used_layoutlm", False)
+                            parsed_data["experience_years"] = self._calculate_experience_years(parsed_data.get("experience", []))
+                            quality_score = self._calculate_quality_score(parsed_data, raw_text, used_layoutlm=used_layoutlm)
+                            parsed_data["quality_score"] = quality_score
+                            set_cache(cache_key, parsed_data, ttl=3600 * 24)
+                            return parsed_data
                 except ImportError as e:
                     logger.error("layout_parser_import_failed", error=str(e), exc_info=True)
                     # Layout parser not available - fallback to NER
@@ -139,7 +178,8 @@ class AIParser:
                     logger.error("vision_first_parsing_failed", 
                                error=str(e), 
                                error_type=type(e).__name__,
-                               exc_info=True)
+                               exc_info=True,
+                               pdf_path=pdf_path)
                     # Continue to NER fallback
             
             # STEP 2: FALLBACK - NER-based parsing (only if vision-first failed or no PDF)
@@ -202,12 +242,30 @@ class AIParser:
         Parse resume using layout-aware pipeline (LayoutLMv3 + Section Detection + Semantic Normalization)
         This is the new primary method for complex resumes
         """
-        logger.info("_parse_with_layout_called", pdf_path=pdf_path, text_length=len(text) if text else 0)
+        logger.info("_parse_with_layout_called", 
+                   pdf_path=pdf_path, 
+                   text_length=len(text) if text else 0,
+                   pdf_path_exists=Path(pdf_path).exists() if pdf_path else False)
         try:
             from app.resumes.layout_parser import LayoutParser
             logger.info("layout_parser_imported_successfully")
-            layout_parser = LayoutParser()
-            logger.info("layout_parser_initialized", pdf_path=pdf_path)
+            
+            # Check if LayoutParser can be instantiated
+            try:
+                layout_parser = LayoutParser()
+                logger.info("layout_parser_initialized", 
+                           pdf_path=pdf_path,
+                           layoutlm_available=layout_parser.layoutlm_processor.is_available,
+                           device=layout_parser.device)
+            except Exception as init_error:
+                logger.error("layout_parser_initialization_failed", 
+                           error=str(init_error),
+                           error_type=type(init_error).__name__,
+                           exc_info=True)
+                return None
+            
+            # Call parse method
+            logger.info("calling_layout_parser_parse", pdf_path=pdf_path)
             parsed_data = layout_parser.parse(pdf_path, text_from_pdf=text)
             logger.info("layout_parser_parse_completed", 
                        has_data=bool(parsed_data),

@@ -7,6 +7,7 @@ from app.models.job import JobDescription
 from app.models.candidate import Candidate
 from app.models.matching import MatchResult, AIExplanation
 from app.models.audit import AuditLog
+from app.models.candidate_kundali import CandidateKundali
 
 __all__ = [
     "User",
@@ -15,6 +16,7 @@ __all__ = [
     "ResumeVersion",
     "JobDescription",
     "Candidate",
+    "CandidateKundali",
     "MatchResult",
     "AIExplanation",
     "AuditLog",

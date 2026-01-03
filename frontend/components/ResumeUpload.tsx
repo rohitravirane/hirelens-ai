@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import api from '@/lib/api'
 import { useQueryClient } from 'react-query'
 
@@ -15,8 +15,78 @@ export default function ResumeUpload({ isOpen, onClose, onUploadSuccess }: Resum
   const [error, setError] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [dragActive, setDragActive] = useState(false)
+  const [uploadedResumeId, setUploadedResumeId] = useState<number | null>(null)
+  const [processingStatus, setProcessingStatus] = useState<'idle' | 'uploading' | 'processing' | 'completed' | 'failed'>('idle')
+  const [processingMessage, setProcessingMessage] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setFile(null)
+      setUploadedResumeId(null)
+      setProcessingStatus('idle')
+      setProcessingMessage('')
+      setError('')
+    }
+  }, [isOpen])
+
+  // Poll for processing status after upload
+  useEffect(() => {
+    if (!uploadedResumeId || processingStatus !== 'processing') return
+
+    let checkCount = 0
+    const maxChecks = 120 // Maximum 4 minutes (120 * 2 seconds)
+    
+    const checkStatus = async () => {
+      try {
+        checkCount++
+        const response = await api.get(`/api/v1/resumes/${uploadedResumeId}`)
+        const status = response.data.processing_status
+        
+        if (status === 'completed') {
+          setProcessingStatus('completed')
+          setProcessingMessage('Resume processed successfully! Extracted data is ready.')
+          // Wait 1 second then trigger success callback
+          setTimeout(() => {
+            if (onUploadSuccess) {
+              onUploadSuccess(uploadedResumeId)
+            }
+            // Close modal after 2 seconds
+            setTimeout(() => {
+              onClose()
+            }, 2000)
+          }, 1000)
+        } else if (status === 'failed') {
+          setProcessingStatus('failed')
+          setProcessingMessage('Resume processing failed. Please try again or upload a different file.')
+        } else if (status === 'processing') {
+          setProcessingMessage(`Processing resume... (${checkCount * 2}s)`)
+          if (checkCount < maxChecks) {
+            setTimeout(checkStatus, 2000)
+          } else {
+            setProcessingStatus('failed')
+            setProcessingMessage('Processing is taking longer than expected. Please check back later.')
+          }
+        } else if (status === 'pending') {
+          setProcessingMessage('Resume queued for processing...')
+          setTimeout(checkStatus, 2000)
+        }
+      } catch (err) {
+        console.error('Failed to check processing status', err)
+        if (checkCount >= maxChecks) {
+          setProcessingStatus('failed')
+          setProcessingMessage('Unable to check processing status. Please try again later.')
+        } else {
+          setTimeout(checkStatus, 2000)
+        }
+      }
+    }
+    
+    // Start checking after 2 seconds
+    setTimeout(checkStatus, 2000)
+  }, [uploadedResumeId, processingStatus, onUploadSuccess, onClose])
 
   if (!isOpen) return null
 
@@ -63,6 +133,8 @@ export default function ResumeUpload({ isOpen, onClose, onUploadSuccess }: Resum
 
     setError('')
     setLoading(true)
+    setProcessingStatus('uploading')
+    setProcessingMessage('Uploading resume...')
 
     try {
       const formData = new FormData()
@@ -75,19 +147,16 @@ export default function ResumeUpload({ isOpen, onClose, onUploadSuccess }: Resum
       })
       
       queryClient.invalidateQueries('resumes')
-      setFile(null)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
+      setUploadedResumeId(response.data.id)
+      setProcessingStatus('processing')
+      setProcessingMessage('Resume uploaded! Processing started...')
+      setLoading(false)
       
-      if (onUploadSuccess) {
-        onUploadSuccess(response.data.id)
-      } else {
-        onClose()
-      }
+      // Don't close modal - keep it open to show processing status
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to upload resume')
-    } finally {
+      setProcessingStatus('failed')
+      setProcessingMessage('Upload failed. Please try again.')
       setLoading(false)
     }
   }
@@ -111,6 +180,50 @@ export default function ResumeUpload({ isOpen, onClose, onUploadSuccess }: Resum
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
               {error}
+            </div>
+          )}
+
+          {/* Processing Status */}
+          {processingStatus !== 'idle' && (
+            <div className={`mb-4 p-4 rounded-lg ${
+              processingStatus === 'completed' 
+                ? 'bg-green-50 border border-green-200' 
+                : processingStatus === 'failed'
+                ? 'bg-red-50 border border-red-200'
+                : 'bg-blue-50 border border-blue-200'
+            }`}>
+              <div className="flex items-center space-x-3">
+                {processingStatus === 'processing' || processingStatus === 'uploading' ? (
+                  <svg className="animate-spin h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647A7.962 7.962 0 0112 20c4.418 0 8-3.582 8-8h-4a4 4 0 11-8 0v4z"></path>
+                  </svg>
+                ) : processingStatus === 'completed' ? (
+                  <svg className="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                ) : (
+                  <svg className="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )}
+                <div className="flex-1">
+                  <p className={`text-sm font-medium ${
+                    processingStatus === 'completed' 
+                      ? 'text-green-800' 
+                      : processingStatus === 'failed'
+                      ? 'text-red-800'
+                      : 'text-blue-800'
+                  }`}>
+                    {processingMessage || 'Processing...'}
+                  </p>
+                  {processingStatus === 'processing' && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      This may take 30-60 seconds. Please keep this window open...
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -179,17 +292,20 @@ export default function ResumeUpload({ isOpen, onClose, onUploadSuccess }: Resum
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                disabled={processingStatus === 'processing' || processingStatus === 'uploading'}
+                className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Cancel
+                {processingStatus === 'completed' ? 'Close' : 'Cancel'}
               </button>
-              <button
-                type="submit"
-                disabled={loading || !file}
-                className="w-full sm:w-auto px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
-              >
-                {loading ? 'Uploading...' : 'Upload Resume'}
-              </button>
+              {processingStatus === 'idle' && (
+                <button
+                  type="submit"
+                  disabled={loading || !file}
+                  className="w-full sm:w-auto px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {loading ? 'Uploading...' : 'Upload Resume'}
+                </button>
+              )}
             </div>
           </form>
         </div>

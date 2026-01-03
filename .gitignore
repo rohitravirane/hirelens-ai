@@ -24,16 +24,15 @@ wheels/
 venv/
 env/
 ENV/
-.venv
 
-# IDEs
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# Environment variables
+# Environment
 .env
 .env.local
 .env.*.local
@@ -44,24 +43,19 @@ logs/
 
 # Database
 *.db
+*.sqlite
 *.sqlite3
 
-# Docker
-.dockerignore
+# Uploads (keep structure, ignore files)
+uploads/*
+!uploads/.gitkeep
 
-# Frontend
+# Node
 node_modules/
 .next/
 out/
-dist/
-build/
+.nuxt/
 .cache/
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
 
 # OS
 .DS_Store
@@ -70,18 +64,31 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
-.cache/
-
-# Uploads
-uploads/
-resumes/
-*.pdf
-*.docx
-
-# Redis dump
-dump.rdb
+*.bak
+*.backup
 
 # Celery
 celerybeat-schedule
 celerybeat.pid
 
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation builds
+docs/_build/
+
+# Model files (too large for git)
+*.bin
+*.safetensors
+models/
+*.onnx
+
+# Jupyter
+.ipynb_checkpoints/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
