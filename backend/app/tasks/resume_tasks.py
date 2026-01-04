@@ -80,6 +80,22 @@ def process_resume_task(self: Task, resume_id: int):
                        has_experience=bool(candidate_kundali.get("experience")),
                        has_personality=bool(candidate_kundali.get("personality_inference")))
             
+            # Check if kundali parsing failed (Ollama not available or returned empty data)
+            name = candidate_kundali.get("identity", {}).get("name", "unknown")
+            confidence = candidate_kundali.get("overall_confidence_score", 0.0)
+            has_experience = bool(candidate_kundali.get("experience"))
+            has_skills = bool(candidate_kundali.get("skills", {}).get("frontend") or 
+                            candidate_kundali.get("skills", {}).get("backend") or
+                            candidate_kundali.get("skills", {}).get("tools"))
+            
+            # If kundali parsing failed (name is unknown, confidence is 0, no experience/skills), fall back to AI parser
+            if (name == "unknown" or name == "") and confidence == 0.0 and not has_experience and not has_skills:
+                logger.warning("kundali_parsing_returned_empty_data_falling_back_to_ai_parser", 
+                             resume_id=resume_id, 
+                             ollama_available=kundali_parser.ollama_available)
+                # Fall back to AI parser
+                raise ValueError("Kundali parser returned empty data - falling back to AI parser")
+            
             # Convert Kundali to legacy parsed_data format (for backward compatibility)
             parsed_data = _kundali_to_parsed_data(candidate_kundali, raw_text=raw_text)
             parsed_data["_metadata"] = {

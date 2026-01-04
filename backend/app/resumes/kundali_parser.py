@@ -132,10 +132,11 @@ class CandidateKundaliParser:
                     return self._empty_kundali()
             else:
                 logger.error("ollama_not_available")
-                return self._empty_kundali()
+                # Even if Ollama is not available, try to extract basic info from text
+                kundali = self._empty_kundali()
             
-            # Step 3: Post-process and validate
-            kundali = self._post_process_kundali(kundali)
+            # Step 3: Post-process and validate (with text-based fallback enhancement)
+            kundali = self._post_process_kundali(kundali, text_from_pdf=text_from_pdf)
             
             logger.info("kundali_parsing_complete", 
                        has_identity=bool(kundali.get("candidate_kundali", {}).get("identity", {}).get("name")),
@@ -371,7 +372,7 @@ EXTRACTION RULES - FOLLOW STRICTLY:
 
 4. PROJECTS: Distinguish personal vs company projects (look for "personal project", "side project", GitHub links)
 
-5. SKILLS - EXTRACT ALL MENTIONED:
+5. SKILLS - EXTRACT ALL MENTIONED (BUT EXCLUDE COMPANY NAMES):
    - Look for a Skills section in the resume
    - Extract EVERY skill/technology mentioned
    - Common skills: JavaScript, HTML, CSS, .NET, React.js, Angular.js, Node.js, REST APIs, Spring, SOAP, Scrum/Agile
@@ -381,8 +382,10 @@ EXTRACTION RULES - FOLLOW STRICTLY:
      * Data: SQL, NoSQL, MongoDB, MySQL, etc.
      * DevOps: Docker, Kubernetes, Git, CI/CD, etc.
      * Tools: Git, Jira, Webpack, etc.
+   - CRITICAL: DO NOT include company names in skills (e.g., "Deloitte", "Kanishka Software Pvt Ltd", "Team 4 Progress Technologies" are COMPANIES, not skills)
    - DO NOT skip skills - extract ALL of them
    - If you see "JavaScript" → include it, if you see "HTML" → include it, if you see ".NET" → include it
+   - Company names belong in experience.company field, NOT in skills arrays
 
 6. CERTIFICATIONS - EXTRACT ALL:
    - Look for Certifications section
@@ -548,8 +551,8 @@ Return ONLY valid JSON. No explanations, no markdown, just JSON.
             return json_match.group(0)
         return '{"candidate_kundali": {}}'
     
-    def _post_process_kundali(self, kundali: Dict[str, Any]) -> Dict[str, Any]:
-        """Post-process and validate Kundali data"""
+    def _post_process_kundali(self, kundali: Dict[str, Any], text_from_pdf: Optional[str] = None) -> Dict[str, Any]:
+        """Post-process and validate Kundali data, with text-based fallback enhancement"""
         kundali_data = kundali.get("candidate_kundali", {})
         
         # Ensure all required fields exist
@@ -560,10 +563,59 @@ Return ONLY valid JSON. No explanations, no markdown, just JSON.
         if "skills" not in kundali_data:
             kundali_data["skills"] = {}
         
-        # Normalize online presence
+        identity = kundali_data.get("identity", {})
         online_presence = kundali_data.get("online_presence", {})
+        
+        # TEXT-BASED FALLBACK ENHANCEMENT: If fields are missing/unknown, extract from text
+        if text_from_pdf:
+            # Enhance name extraction if missing
+            if not identity.get("name") or identity.get("name") == "unknown":
+                extracted_name = self._extract_name_from_text(text_from_pdf)
+                if extracted_name and extracted_name != "unknown":
+                    identity["name"] = extracted_name
+                    logger.info("name_extracted_from_text_fallback", name=extracted_name)
+            
+            # Enhance email if missing (already done in tasks, but double-check)
+            if not identity.get("email") or identity.get("email") == "unknown":
+                from app.tasks.resume_tasks import _extract_email_from_text
+                extracted_email = _extract_email_from_text(text_from_pdf)
+                if extracted_email and extracted_email != "unknown":
+                    identity["email"] = extracted_email
+            
+            # Enhance phone if missing (already done in tasks, but double-check)
+            if not identity.get("phone") or identity.get("phone") == "unknown":
+                from app.tasks.resume_tasks import _extract_phone_from_text
+                extracted_phone = _extract_phone_from_text(text_from_pdf)
+                if extracted_phone and extracted_phone != "unknown":
+                    identity["phone"] = extracted_phone
+            
+            # Enhance URLs if missing
+            if not isinstance(online_presence, dict):
+                online_presence = {"portfolio": [], "github": [], "linkedin": [], "other_links": []}
+            
+            # Extract URLs from text if not found
+            if not online_presence.get("linkedin") and not online_presence.get("github") and not online_presence.get("portfolio"):
+                extracted_urls = self._extract_urls_from_text(text_from_pdf)
+                if extracted_urls:
+                    if not online_presence.get("linkedin"):
+                        online_presence["linkedin"] = extracted_urls.get("linkedin", [])
+                    if not online_presence.get("github"):
+                        online_presence["github"] = extracted_urls.get("github", [])
+                    if not online_presence.get("portfolio"):
+                        online_presence["portfolio"] = extracted_urls.get("portfolio", [])
+                    if not online_presence.get("other_links"):
+                        online_presence["other_links"] = extracted_urls.get("other_links", [])
+                    logger.info("urls_extracted_from_text_fallback", 
+                               linkedin_count=len(online_presence.get("linkedin", [])),
+                               github_count=len(online_presence.get("github", [])),
+                               portfolio_count=len(online_presence.get("portfolio", [])))
+        
+        # Normalize online presence
         if not isinstance(online_presence, dict):
             kundali_data["online_presence"] = {"portfolio": [], "github": [], "linkedin": [], "other_links": []}
+        else:
+            kundali_data["online_presence"] = online_presence
+        kundali_data["identity"] = identity
         
         # Ensure skills structure
         skills = kundali_data.get("skills", {})
@@ -577,6 +629,45 @@ Return ONLY valid JSON. No explanations, no markdown, just JSON.
                 "tools": [],
                 "soft_skills": []
             }
+        
+        # CLEAN SKILLS: Remove company names from skills arrays
+        # Extract all company names from experience
+        experience = kundali_data.get("experience", [])
+        company_names = set()
+        for exp_entry in experience:
+            company = exp_entry.get("company", "")
+            if company and company != "unknown":
+                # Normalize: lowercase, remove common suffixes
+                company_normalized = company.lower().strip()
+                company_names.add(company_normalized)
+                # Also add partial matches (e.g., "Kanishka Software" matches "Kanishka Software Pvt Ltd")
+                words = company_normalized.split()
+                if len(words) > 1:
+                    # Add company without common suffixes
+                    for suffix in ["pvt", "ltd", "inc", "llc", "corp", "corporation", "technologies", "tech", "software", "solutions", "services"]:
+                        if words[-1] == suffix and len(words) > 1:
+                            company_names.add(" ".join(words[:-1]))
+                    # Add first word (e.g., "Kanishka" from "Kanishka Software Pvt Ltd")
+                    if len(words) >= 2:
+                        company_names.add(words[0])
+        
+        # Filter out company names from all skill categories
+        skill_categories = ["frontend", "backend", "data", "devops", "ai_ml", "tools", "soft_skills"]
+        cleaned_count = 0
+        for category in skill_categories:
+            if category in skills and isinstance(skills[category], list):
+                original_count = len(skills[category])
+                skills[category] = [
+                    skill for skill in skills[category]
+                    if skill and isinstance(skill, str) and not self._is_company_name(skill, company_names)
+                ]
+                cleaned_count += original_count - len(skills[category])
+        
+        if cleaned_count > 0:
+            logger.info("cleaned_company_names_from_skills", 
+                       removed_count=cleaned_count,
+                       companies=list(company_names)[:5])  # Log first 5 companies
+            kundali_data["skills"] = skills
         
         # Calculate total experience years if missing
         if "total_experience_years" not in kundali_data or not kundali_data["total_experience_years"]:
@@ -664,6 +755,156 @@ Return ONLY valid JSON. No explanations, no markdown, just JSON.
             score += 1.0
         
         return round(score / max_score, 2)
+    
+    def _is_company_name(self, skill: str, company_names: set) -> bool:
+        """Check if a skill string is actually a company name"""
+        if not skill or not isinstance(skill, str):
+            return False
+        
+        skill_lower = skill.lower().strip()
+        
+        # Direct match
+        if skill_lower in company_names:
+            return True
+        
+        # Partial match: check if skill contains or is contained in any company name
+        for company in company_names:
+            # Skill is part of company name (e.g., "Kanishka" in "Kanishka Software Pvt Ltd")
+            if company and skill_lower in company:
+                # But exclude very short matches (e.g., "Tech" is too generic)
+                if len(skill_lower) >= 4:  # Only match if skill is at least 4 chars
+                    return True
+            # Company name is part of skill (e.g., "Kanishka Software Pvt Ltd" contains "Kanishka")
+            if company and company in skill_lower:
+                return True
+        
+        # Common company name patterns (extra safety check)
+        company_patterns = [
+            r'\b(pvt|ltd|inc|llc|corp|corporation)\b',
+            r'\b(technologies|tech|software|solutions|services|systems|consulting)\s+\w+',
+        ]
+        import re
+        for pattern in company_patterns:
+            if re.search(pattern, skill_lower):
+                # But allow if it's a legitimate technology name (e.g., "Tech Stack" is OK)
+                if skill_lower not in ["tech stack", "stack", "backend", "frontend"]:
+                    # Check if it matches a known company
+                    for company in company_names:
+                        if skill_lower in company or company in skill_lower:
+                            return True
+        
+        return False
+    
+    def _extract_name_from_text(self, text: str) -> str:
+        """Extract candidate name from resume text using heuristics"""
+        if not text:
+            return "unknown"
+        
+        # Strategy: Name is usually at the top, in large text, or after "RESUME" / before contact info
+        lines = text.split('\n')
+        
+        # Look at first 10 lines (name is usually at the top)
+        for i, line in enumerate(lines[:10]):
+            line = line.strip()
+            if not line or len(line) < 3:
+                continue
+            
+            # Skip common header patterns
+            if any(skip in line.upper() for skip in ['RESUME', 'CV', 'CURRICULUM', 'PHONE', 'EMAIL', 'CONTACT', 'ADDRESS']):
+                continue
+            
+            # Name pattern: 2-4 words, mostly capitalized or Title Case, no special chars except hyphens/apostrophes
+            # Name usually doesn't contain numbers, @, :, etc.
+            words = line.split()
+            if 2 <= len(words) <= 4:
+                # Check if it looks like a name (Title Case or ALL CAPS, no email/phone patterns)
+                if not re.search(r'[@:\d{10,}]', line):  # No email/phone patterns
+                    # Check if it's mostly letters and common name characters
+                    if re.match(r'^[A-Za-z\s\-\'\.]+$', line):
+                        # Skip if it's all lowercase (unlikely to be name at top)
+                        if not line.islower():
+                            return line
+        
+        return "unknown"
+    
+    def _extract_urls_from_text(self, text: str) -> Dict[str, List[str]]:
+        """Extract URLs from resume text (LinkedIn, GitHub, portfolio, etc.)"""
+        if not text:
+            return {"linkedin": [], "github": [], "portfolio": [], "other_links": []}
+        
+        urls = {
+            "linkedin": [],
+            "github": [],
+            "portfolio": [],
+            "other_links": []
+        }
+        
+        # Comprehensive URL patterns
+        # LinkedIn patterns
+        linkedin_patterns = [
+            r'linkedin\.com/in/[a-zA-Z0-9\-_]+',
+            r'linkedin\.com/profile/view\?id=[a-zA-Z0-9\-_]+',
+            r'linkedin\.com/pub/[a-zA-Z0-9\-_]+',
+        ]
+        
+        # GitHub patterns
+        github_patterns = [
+            r'github\.com/[a-zA-Z0-9\-_]+',
+            r'github\.io/[a-zA-Z0-9\-_]+',
+        ]
+        
+        # Portfolio/website patterns (personal domains, common portfolio sites)
+        portfolio_patterns = [
+            r'www\.[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}',  # www.domain.com
+            r'[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}(?:/[a-zA-Z0-9\-_/]*)?',  # domain.com/path
+        ]
+        
+        # Extract LinkedIn URLs
+        for pattern in linkedin_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                url = f"https://{match}" if not match.startswith('http') else match
+                if url not in urls["linkedin"]:
+                    urls["linkedin"].append(url)
+        
+        # Extract GitHub URLs
+        for pattern in github_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                url = f"https://{match}" if not match.startswith('http') else match
+                if url not in urls["github"]:
+                    urls["github"].append(url)
+        
+        # Extract all URLs (including portfolio)
+        all_url_pattern = r'(?:https?://)?(?:www\.)?[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}(?:/[a-zA-Z0-9\-_/\.]*)?'
+        all_matches = re.findall(all_url_pattern, text, re.IGNORECASE)
+        
+        for match in all_matches:
+            # Skip if already in LinkedIn or GitHub
+            if any(site in match.lower() for site in ['linkedin.com', 'github.com']):
+                continue
+            
+            # Skip email domains (common patterns like gmail.com, yahoo.com in contact section)
+            if match.lower().split('.')[0] in ['gmail', 'yahoo', 'hotmail', 'outlook', 'icloud', 'aol']:
+                continue
+            
+            url = f"https://{match}" if not match.startswith('http') else match
+            
+            # Determine category
+            if any(site in url.lower() for site in ['portfolio', 'personal', 'blog', 'website', 'www.']):
+                if url not in urls["portfolio"]:
+                    urls["portfolio"].append(url)
+            else:
+                # Check if it's a known portfolio/service site
+                portfolio_domains = ['behance.net', 'dribbble.com', 'medium.com', 'dev.to', 'hashnode.com', 
+                                   'kaggle.com', 'stackoverflow.com', 'twitter.com', 'x.com']
+                if any(domain in url.lower() for domain in portfolio_domains):
+                    if url not in urls["other_links"]:
+                        urls["other_links"].append(url)
+                elif url not in urls["portfolio"]:  # Default to portfolio for personal domains
+                    urls["portfolio"].append(url)
+        
+        return urls
     
     def _empty_kundali(self) -> Dict[str, Any]:
         """Return empty Kundali structure"""

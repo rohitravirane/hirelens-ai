@@ -80,8 +80,8 @@ class Settings(BaseSettings):
     
     # File Upload
     MAX_UPLOAD_SIZE_MB: int = 10
-    # Comma-separated string in .env, converted to list
-    ALLOWED_FILE_EXTENSIONS: str = "pdf,docx,doc"
+    # Comma-separated string in .env, converted to list - ONLY PDF resumes allowed
+    ALLOWED_FILE_EXTENSIONS: str = "pdf"
     UPLOAD_DIR: str = "./uploads"
     
     @property

@@ -23,8 +23,8 @@ HireLens AI is not a demo or tutorial project. It's a **real-world, enterprise-g
 - ✅ **Candidate Ranking**: Percentile-based ranking with confidence levels
 - ✅ **Recruiter Dashboard**: Interactive UI with tabs, modals, drag-drop, and real-time notifications
 - ✅ **Job Management**: Create and manage tech jobs with AI-powered parsing
-- ✅ **Resume Upload**: Drag-and-drop resume upload with automatic AI parsing
-- ✅ **Candidate Management**: Add and manage candidates with resume linking and auto-fill from extracted data
+- ✅ **Resume Upload**: PDF-only upload with world-class validation (automatically detects if file is actually a resume)
+- ✅ **Candidate Management**: Combined Add Candidate flow - upload resume → auto-process → form auto-fill → create candidate (single smooth flow)
 - ✅ **Interactive Rankings**: View AI-powered candidate rankings with detailed explanations
 - ✅ **Bulk Matching**: Match all candidates to a job with one click
 - ✅ **Quality Control**: Quality indicators prevent matching with low-quality resume data
@@ -124,12 +124,12 @@ read_file
 The recruiter dashboard includes:
 
 - **Jobs Tab**: View all jobs, create new jobs with AI-powered parsing
-- **Candidates Tab**: Upload resumes (drag & drop), add candidates, view candidate list with quality indicators
+- **Candidates Tab**: Add candidates (single combined flow: upload PDF resume → auto-process → form auto-fill → create), view candidate list with quality indicators
 - **Rankings Tab**: View AI-powered candidate rankings for selected jobs
 - **Interactive Modals**: 
   - Job creation form with full job description parsing
   - Job details modal with sticky header showing full job description
-  - Resume upload with drag-and-drop support
+  - **Combined Add Candidate modal** with 3-step flow (Upload Resume → Processing → Add Details)
   - Candidate creation form with auto-fill from extracted resume data
   - Candidate details modal with quality score, experience, skills, and reprocessing
 - **Quality Indicators**: 
@@ -206,8 +206,7 @@ hirelens-ai/
 │   ├── components/         # React components
 │   │   ├── JobModal.tsx    # Job creation modal
 │   │   ├── JobDetailsModal.tsx # Job details view
-│   │   ├── ResumeUpload.tsx # Resume upload with drag-drop
-│   │   ├── CandidateModal.tsx # Candidate creation form (with auto-fill)
+│   │   ├── AddCandidateModal.tsx # Combined candidate creation (upload + form + create in single flow)
 │   │   ├── CandidateDetailsModal.tsx # Candidate details view
 │   │   └── BulkReprocessModal.tsx # Bulk reprocessing
 │   ├── lib/                # Utilities
@@ -260,9 +259,13 @@ A 360° technical + professional + behavioral snapshot that includes:
 The system uses a **simplified, intelligent architecture** that prioritizes understanding over complexity:
 
 **Pipeline Flow:**
-1. **PDF Upload**: Resume uploaded via drag-and-drop or API
-2. **Text Extraction**: Extract raw text from PDF using rule-based parser (pdfplumber/pypdf2)
-3. **Resume Validation**: Validate that document is actually a resume (score-based validation)
+1. **PDF Upload**: Resume uploaded via drag-and-drop or API (**PDF-only**, DOCX/DOC files are rejected immediately)
+2. **Early Validation**: World-class resume validation at upload endpoint (before async processing)
+   - Extracts text from PDF immediately
+   - Validates if document is actually a resume (score-based validation)
+   - Rejects non-resume files with user-friendly error messages
+   - Only valid resumes proceed to processing
+3. **Text Extraction**: Extract raw text from PDF using rule-based parser (pdfplumber/pypdf2)
 4. **Qwen Model** (PRIMARY):
    - **Model**: Qwen2.5-7B-Instruct (text-only, quantized q4_K_M, via Ollama)
    - **Integration**: Via Ollama API at `host.docker.internal:11434`
@@ -283,6 +286,7 @@ The system uses a **simplified, intelligent architecture** that prioritizes unde
    - **Seniority Assessment**: Evidence-based (years, roles, responsibilities)
    - **Quality Scoring**: Based on data completeness and clarity
 7. **Post-Processing & Validation**:
+   - **Skills Cleaning**: Automatically removes company names from skills arrays (e.g., "Team 4 Progress Technologies" removed from tools/skills)
    - Normalize online presence URLs (add `https://` if missing)
    - Calculate experience years
    - Email/Phone regex fallback (if AI misses them)
@@ -292,7 +296,10 @@ The system uses a **simplified, intelligent architecture** that prioritizes unde
 9. **Resume Version**: Create ResumeVersion with parsed data for backward compatibility
 
 **Key Features:**
+- ✅ **PDF-Only Upload**: Only PDF resume files accepted (DOCX/DOC rejected immediately)
+- ✅ **World-Class Validation**: Validates if file is actually a resume before processing (detects invoices, contracts, academic papers, etc.)
 - ✅ **Text-First Extraction**: Extract text from PDF first, then process with Qwen text-only model (more reliable than PDF base64 for text models)
+- ✅ **Skills Cleaning**: Automatically removes company names from skills arrays (post-processing)
 - ✅ **Personality Inference**: Understands work style, ownership, learning orientation (with confidence)
 - ✅ **100% Offline**: No API calls, all models run locally (Qwen via Ollama)
 - ✅ **Unlimited Usage**: No rate limits, no costs, complete privacy
@@ -302,6 +309,7 @@ The system uses a **simplified, intelligent architecture** that prioritizes unde
 - ✅ **Anti-Hallucination**: Strict rules prevent inventing companies/roles
 - ✅ **Complete Extraction**: Extracts ALL experience entries and ALL skills
 - ✅ **Email/Phone Fallback**: Regex-based extraction if AI fails
+- ✅ **Combined Add Candidate Flow**: Single smooth flow - upload resume → auto-process → form auto-fill → create candidate
 
 **Quality Scoring System:**
 - **Overall Confidence Score**: 0.0-1.0 based on data completeness
@@ -321,12 +329,20 @@ The system uses a **simplified, intelligent architecture** that prioritizes unde
 3. **Fallback 2**: Legacy AI Parser (LayoutLMv3 + NER + HURIDOCS) → Vision-first document AI with layout analysis
 4. **Fallback 3**: Rule-based parser → Pattern matching and heuristics
 
+**File Upload Requirements:**
+- **Only PDF files accepted** (DOCX/DOC files are rejected immediately)
+- **World-class validation**: System validates if uploaded file is actually a resume before processing
+- **Max file size**: 10MB
+- **Validation errors**: Clear, user-friendly error messages if file is not a resume
+
 **API Example:**
 ```bash
 curl -X POST http://localhost:8000/api/v1/resumes/upload \
   -H "Authorization: Bearer <token>" \
   -F "file=@resume.pdf"
 ```
+
+**Note**: Only PDF files are accepted. Non-PDF files or files that don't appear to be resumes will be rejected with clear error messages.
 
 ### 2. Job Description Intelligence
 
@@ -421,9 +437,14 @@ The system uses a **Qwen Text-Based Architecture** (production-grade, 100% offli
 
 **PRIMARY METHOD - Qwen Text-Based Pipeline (Current Production):**
 
-1. **PDF Upload**: Resume uploaded via API or frontend
-2. **Text Extraction**: Extract raw text from PDF using rule-based parser (pdfplumber/pypdf2)
-3. **Resume Validation**: Score-based validation to ensure document is a resume
+1. **PDF Upload**: Resume uploaded via API or frontend (**PDF-only**, DOCX/DOC files rejected immediately)
+2. **Early Validation**: World-class resume validation at upload endpoint (before async processing)
+   - Extracts text from PDF immediately for validation
+   - Validates if document is actually a resume using score-based validation
+   - Rejects non-resume files (invoices, contracts, academic papers, etc.) with clear error messages
+   - Only valid resumes proceed to async processing
+3. **Text Extraction**: Extract raw text from PDF using rule-based parser (pdfplumber/pypdf2)
+4. **Resume Validation** (Async): Additional validation during async processing (redundant check)
 4. **Qwen Model** (PRIMARY):
    - **Text-Only Model**: Qwen2.5-7B-Instruct (q4_K_M quantized) via Ollama (uses extracted `raw_text`)
    - **Model Name**: `qwen2.5:7b-instruct-q4_K_M`
@@ -438,6 +459,7 @@ The system uses a **Qwen Text-Based Architecture** (production-grade, 100% offli
    - **Structured Output**: JSON format with identity, experience, skills, personality
    - **Confidence Scores**: Every inference has confidence (0.0-1.0)
 6. **Post-Processing**:
+   - **Skills Cleaning**: Automatically removes company names from skills arrays (compares extracted companies with skills, filters matches)
    - Email/Phone regex fallback (if AI misses them)
    - URL normalization (add `https://` if missing)
    - Experience years calculation
@@ -495,6 +517,11 @@ The system uses a **Qwen Text-Based Architecture** (production-grade, 100% offli
 - **Complete Extraction**: Extracts ALL experience entries and ALL skills
 
 ### Configuration
+
+**File Upload Configuration:**
+- **ALLOWED_FILE_EXTENSIONS**: `"pdf"` (only PDF resumes allowed)
+- **MAX_UPLOAD_SIZE_MB**: `10` (maximum file size)
+- **Early Validation**: Enabled by default (validates resume before async processing)
 
 **Resume Parsing Configuration:**
 - Resume parsing uses Ollama directly (not controlled by AI_PROVIDER)
@@ -699,7 +726,8 @@ OPENAI_API_KEY=your-api-key-here
 - Password hashing with bcrypt
 - RBAC at service layer
 - Input validation (Pydantic)
-- File upload restrictions
+- File upload restrictions (PDF-only, max 10MB)
+- World-class resume validation (detects non-resume files before processing)
 - CORS configuration
 - Rate limiting
 - Audit logging

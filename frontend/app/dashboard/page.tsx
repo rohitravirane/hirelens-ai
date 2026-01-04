@@ -5,8 +5,7 @@ import { useQuery, useMutation, useQueryClient } from 'react-query'
 import api from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import JobModal from '@/components/JobModal'
-import ResumeUpload from '@/components/ResumeUpload'
-import CandidateModal from '@/components/CandidateModal'
+import AddCandidateModal from '@/components/AddCandidateModal'
 import JobDetailsModal from '@/components/JobDetailsModal'
 import CandidateDetailsModal from '@/components/CandidateDetailsModal'
 import BulkReprocessModal from '@/components/BulkReprocessModal'
@@ -16,14 +15,12 @@ export default function DashboardPage() {
   const queryClient = useQueryClient()
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
   const [showJobModal, setShowJobModal] = useState(false)
-  const [showResumeModal, setShowResumeModal] = useState(false)
-  const [showCandidateModal, setShowCandidateModal] = useState(false)
+  const [showAddCandidateModal, setShowAddCandidateModal] = useState(false)
   const [showJobDetailsModal, setShowJobDetailsModal] = useState(false)
   const [showCandidateDetailsModal, setShowCandidateDetailsModal] = useState(false)
   const [showBulkReprocessModal, setShowBulkReprocessModal] = useState(false)
   const [selectedJobDetailsId, setSelectedJobDetailsId] = useState<number | null>(null)
   const [selectedCandidateDetailsId, setSelectedCandidateDetailsId] = useState<number | null>(null)
-  const [selectedResumeId, setSelectedResumeId] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<'jobs' | 'candidates' | 'rankings'>('jobs')
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [matchingCandidateId, setMatchingCandidateId] = useState<number | null>(null)
@@ -151,19 +148,6 @@ export default function DashboardPage() {
     setTimeout(() => setNotification(null), 5000)
   }
 
-  const handleResumeUploadSuccess = async (resumeId: number) => {
-    setSelectedResumeId(resumeId)
-    setShowResumeModal(false)
-    
-    // ResumeUpload component already handled processing status
-    // Now open candidate modal with extracted data
-    showNotification('Resume processed! Opening candidate form...', 'success')
-    
-    // Small delay to ensure resume data is available
-    setTimeout(() => {
-          setShowCandidateModal(true)
-    }, 500)
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -373,16 +357,7 @@ export default function DashboardPage() {
                   </button>
                 )}
                 <button
-                  onClick={() => setShowResumeModal(true)}
-                  className="w-full sm:w-auto px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center justify-center space-x-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  <span>Upload Resume</span>
-                </button>
-                <button
-                  onClick={() => setShowCandidateModal(true)}
+                  onClick={() => setShowAddCandidateModal(true)}
                   className="w-full sm:w-auto px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 flex items-center justify-center space-x-2"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -632,13 +607,7 @@ export default function DashboardPage() {
                 <p className="mt-2 text-sm text-gray-500">Upload a resume and add candidates to get started</p>
                 <div className="mt-6 flex justify-center space-x-3">
                   <button
-                    onClick={() => setShowResumeModal(true)}
-                    className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
-                  >
-                    Upload Resume
-                  </button>
-                  <button
-                    onClick={() => setShowCandidateModal(true)}
+                    onClick={() => setShowAddCandidateModal(true)}
                     className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
                   >
                     Add Candidate
@@ -834,18 +803,9 @@ export default function DashboardPage() {
 
       {/* Modals */}
       <JobModal isOpen={showJobModal} onClose={() => setShowJobModal(false)} />
-      <ResumeUpload
-        isOpen={showResumeModal}
-        onClose={() => setShowResumeModal(false)}
-        onUploadSuccess={handleResumeUploadSuccess}
-      />
-      <CandidateModal
-        isOpen={showCandidateModal}
-        onClose={() => {
-          setShowCandidateModal(false)
-          setSelectedResumeId(null)
-        }}
-        resumeId={selectedResumeId || undefined}
+      <AddCandidateModal
+        isOpen={showAddCandidateModal}
+        onClose={() => setShowAddCandidateModal(false)}
       />
       <JobDetailsModal
         isOpen={showJobDetailsModal}

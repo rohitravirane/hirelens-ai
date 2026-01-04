@@ -17,11 +17,14 @@ from app.auth.dependencies import get_current_active_user
 from app.models.user import User
 from app.models.resume import Resume, ResumeVersion
 from app.resumes.parser import ResumeParser
+from app.resumes.resume_validator import ResumeValidator
 from app.resumes.schemas import ResumeResponse, ResumeDetailResponse, ResumeVersionResponse
 from app.tasks.resume_tasks import process_resume_task
 
 router = APIRouter(prefix="/api/v1/resumes", tags=["Resumes"])
 logger = structlog.get_logger()
+parser = ResumeParser()
+resume_validator = ResumeValidator()
 
 # Ensure upload directory exists
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
@@ -33,12 +36,13 @@ def upload_resume(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Upload and process a resume"""
-    # Validate file type
+    """Upload and process a resume - with world-class validation"""
+    # Validate file type - ONLY PDF resumes allowed
     file_ext = Path(file.filename).suffix.lower().lstrip('.')
-    if file_ext not in settings.ALLOWED_FILE_EXTENSIONS:
+    allowed_extensions = settings.allowed_file_extensions_list
+    if file_ext not in allowed_extensions:
         raise ProcessingError(
-            f"File type not allowed. Allowed types: {', '.join(settings.ALLOWED_FILE_EXTENSIONS)}"
+            f"Only PDF resume files are allowed. Please upload a PDF file."
         )
     
     # Validate file size
@@ -54,9 +58,55 @@ def upload_resume(
     file_name = f"{file_id}.{file_ext}"
     file_path = os.path.join(settings.UPLOAD_DIR, file_name)
     
-    # Save file
+    # Save file temporarily for validation
     with open(file_path, "wb") as f:
         f.write(file_content)
+    
+    # WORLD-CLASS VALIDATION: Extract text and validate if it's actually a resume
+    try:
+        logger.info("validating_resume_before_upload", file_name=file.filename)
+        raw_text = parser.extract_text(file_path)
+        
+        # Validate if document is actually a resume
+        is_valid_resume, validation_details = resume_validator.validate(raw_text)
+        if not is_valid_resume:
+            # Delete the file since it's not a resume
+            try:
+                os.remove(file_path)
+            except:
+                pass
+            
+            score = validation_details.get('score', 0)
+            reasons = validation_details.get('reasons', [])
+            
+            # Create user-friendly error message
+            error_message = "The uploaded file does not appear to be a resume. "
+            if score < 20:
+                error_message += "Please upload a proper resume (CV) file in PDF format. "
+            else:
+                error_message += "The document is missing key resume elements. "
+            
+            error_message += "A resume should contain: contact information (email/phone), work experience, education, and skills."
+            
+            logger.warning("resume_validation_failed_at_upload", 
+                         file_name=file.filename,
+                         score=score,
+                         reasons=reasons)
+            raise ProcessingError(error_message)
+        
+        logger.info("resume_validation_passed_at_upload", 
+                   file_name=file.filename,
+                   score=validation_details.get('score', 0))
+        
+    except ProcessingError:
+        # Re-raise validation errors
+        raise
+    except Exception as e:
+        # If text extraction fails, still allow upload but log warning
+        logger.warning("text_extraction_failed_during_upload_validation", 
+                     file_name=file.filename,
+                     error=str(e))
+        # Don't fail the upload if extraction fails - let async processing handle it
     
     # Create resume record
     resume = Resume(
