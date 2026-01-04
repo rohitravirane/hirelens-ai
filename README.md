@@ -1735,9 +1735,13 @@ npm test
 
 ## 📚 Documentation
 
-- [Architecture](./docs/architecture.md): System design and architecture
-- [AI Reasoning](./docs/ai_reasoning.md): AI explainability and reasoning
-- [Scaling Strategy](./docs/scaling.md): Scaling from 100 to 1M users
+- [🏗️ Architecture](#-architecture) - System design and architecture
+- [🤖 AI Decision Flow](#-ai-decision-flow) - AI explainability and reasoning  
+- [📈 Scaling Strategy](#-scaling-strategy-100--1m-users) - Scaling from 100 to 1M users
+- [📋 API Contracts](#-api-contracts) - Complete API endpoint documentation
+- [⚖️ Architecture Trade-offs](#️-architecture-trade-offs) - Technology choices and rationale
+
+> **Note:** All documentation is now integrated within this README. Click the links above to jump to the respective sections.
 
 ## 🤖 AI Configuration
 
