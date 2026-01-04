@@ -274,6 +274,79 @@ class MatchingService:
         db.commit()
         
         return match_results[:limit]
+    
+    def _calculate_quick_match_score(
+        self,
+        db: Session,
+        candidate_id: int,
+        job_id: int
+    ) -> Optional[Dict[str, float]]:
+        """
+        Quick match score calculation without Ollama analysis (fast)
+        Used for initial filtering in find-best-match
+        """
+        try:
+            # Get candidate data
+            candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
+            if not candidate:
+                return None
+            
+            # Get resume data
+            resume_version = (
+                db.query(ResumeVersion)
+                .join(ResumeVersion.resume)
+                .filter(
+                    ResumeVersion.resume_id == candidate.resume_id,
+                    ResumeVersion.is_current == True,
+                )
+                .first()
+            )
+            
+            if not resume_version:
+                return None
+            
+            # Get job data
+            job = db.query(JobDescription).filter(JobDescription.id == job_id).first()
+            if not job:
+                return None
+            
+            # Prepare data for scoring
+            skills_list = resume_version.skills or []
+            if isinstance(skills_list, dict):
+                flattened_skills = []
+                for category, skill_list in skills_list.items():
+                    if isinstance(skill_list, list):
+                        flattened_skills.extend(skill_list)
+                    elif skill_list:
+                        flattened_skills.append(skill_list)
+                skills_list = flattened_skills
+            
+            candidate_data = {
+                "id": candidate.id,
+                "skills": skills_list,
+                "experience_years": resume_version.experience_years,
+                "experience": resume_version.experience or [],
+                "projects": resume_version.projects or [],
+                "education": resume_version.education or [],
+            }
+            
+            job_data = {
+                "id": job.id,
+                "title": job.title,
+                "company": job.company,
+                "required_skills": job.required_skills or [],
+                "nice_to_have_skills": job.nice_to_have_skills or [],
+                "experience_years_required": job.experience_years_required,
+                "raw_text": job.raw_text or "",
+            }
+            
+            # Only calculate base scores (fast, no Ollama)
+            base_scores = scoring_engine.calculate_match_score(candidate_data, job_data)
+            return base_scores
+            
+        except Exception as e:
+            logger.error("quick_match_score_failed", candidate_id=candidate_id, job_id=job_id, error=str(e))
+            return None
 
 
 # Global instance

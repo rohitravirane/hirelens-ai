@@ -228,26 +228,94 @@ def find_best_match_for_candidate(
             detail="No active jobs found"
         )
     
-    # Match candidate to all jobs
-    best_match = None
-    best_score = -1.0
+    # OPTIMIZATION: First do quick base score calculation for all jobs (fast)
+    # Then only run deep Ollama analysis on top matches
+    logger.info("find_best_match_started", candidate_id=candidate_id, total_jobs=len(active_jobs))
     
+    # Step 1: Quick base score calculation for all jobs (fast, no Ollama)
+    job_scores = []
     for job in active_jobs:
         try:
-            match_result = matching_service.match_candidate_to_job(
-                db, candidate_id, job.id, force_recalculate=False
+            # Check if match already exists
+            existing_match = (
+                db.query(MatchResult)
+                .filter(
+                    MatchResult.candidate_id == candidate_id,
+                    MatchResult.job_description_id == job.id,
+                    MatchResult.is_active == True,
+                )
+                .first()
             )
-            if match_result.overall_score > best_score:
-                best_score = match_result.overall_score
-                best_match = match_result
+            
+            if existing_match:
+                # Use existing match score
+                job_scores.append((job.id, existing_match.overall_score, existing_match))
+            else:
+                # Quick base score calculation (no Ollama, fast)
+                quick_score = matching_service._calculate_quick_match_score(
+                    db, candidate_id, job.id
+                )
+                if quick_score:
+                    job_scores.append((job.id, quick_score["overall_score"], None))
         except Exception as e:
             logger.warning(
-                "match_failed_for_best_match",
+                "quick_match_failed",
                 candidate_id=candidate_id,
                 job_id=job.id,
                 error=str(e)
             )
             continue
+    
+    if not job_scores:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to match candidate to any job"
+        )
+    
+    # Step 2: Sort by score and get top 3 candidates
+    job_scores.sort(key=lambda x: x[1], reverse=True)
+    top_jobs = job_scores[:3]  # Top 3 jobs
+    
+    logger.info("quick_scores_calculated", top_3_scores=[(j[0], j[1]) for j in top_jobs])
+    
+    # Step 3: Run deep Ollama analysis only on top 3 matches
+    best_match = None
+    best_score = -1.0
+    
+    for job_id, quick_score, existing_match in top_jobs:
+        try:
+            if existing_match:
+                # If match exists and score is good, use it
+                if existing_match.overall_score > best_score:
+                    best_score = existing_match.overall_score
+                    best_match = existing_match
+            else:
+                # Run full match with Ollama analysis for top candidates
+                match_result = matching_service.match_candidate_to_job(
+                    db, candidate_id, job_id, force_recalculate=False
+                )
+                if match_result.overall_score > best_score:
+                    best_score = match_result.overall_score
+                    best_match = match_result
+        except Exception as e:
+            logger.warning(
+                "deep_match_failed_for_best_match",
+                candidate_id=candidate_id,
+                job_id=job_id,
+                error=str(e)
+            )
+            continue
+    
+    # If no deep match found, use the best quick match
+    if not best_match and job_scores:
+        # Get the job with best quick score and do a full match
+        best_job_id = job_scores[0][0]
+        try:
+            best_match = matching_service.match_candidate_to_job(
+                db, candidate_id, best_job_id, force_recalculate=False
+            )
+        except Exception as e:
+            logger.error("final_match_failed", candidate_id=candidate_id, job_id=best_job_id, error=str(e))
     
     if not best_match:
         raise HTTPException(

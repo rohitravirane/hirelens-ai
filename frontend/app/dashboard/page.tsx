@@ -808,19 +808,19 @@ export default function DashboardPage() {
                 <p className="mt-4 text-gray-500 font-medium">Loading rankings...</p>
               </div>
             ) : (rankings && rankings.length > 0) ? (
-              <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+              <div>
+                <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200 mb-4 rounded-t-xl">
                   <h3 className="text-lg font-semibold text-gray-900">
                     Ranked Candidates ({rankings.length})
                   </h3>
                   <p className="text-sm text-gray-600 mt-1">Candidates ranked by match score</p>
                 </div>
-                <div className="divide-y divide-gray-100">
+                <div className="space-y-4">
                 {rankings.map((ranking: any, index: number) => (
                   <div 
                     key={ranking.candidate_id} 
                     id={`candidate-${ranking.candidate_id}`}
-                    className={`p-6 hover:bg-gray-50 transition-colors ${
+                    className={`bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-all ${
                       highlightCandidateId === ranking.candidate_id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
                     }`}
                   >
