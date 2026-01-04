@@ -62,6 +62,177 @@ read_file
 - **Phase 1**: Modular Monolith (current)
 - **Phase 2**: Microservices-ready (documented)
 
+## ⚖️ Architecture Trade-offs
+
+### Why FastAPI?
+
+**Chosen:** FastAPI (Python async framework)
+
+**Pros:**
+- ✅ **High Performance**: 3-10x faster than Flask, comparable to Node.js/Go
+- ✅ **Type Safety**: Automatic request/response validation via Pydantic
+- ✅ **Async Support**: Native async/await for I/O-bound operations
+- ✅ **Auto Documentation**: OpenAPI/Swagger docs generated automatically
+- ✅ **Modern Python**: Uses Python 3.11+ features (type hints, dataclasses)
+- ✅ **Developer Experience**: Excellent IDE support, auto-completion
+- ✅ **Production Ready**: Used by Microsoft, Uber, Netflix
+
+**Alternatives Considered:**
+- **Django**: Too heavy, ORM-centric, not async-first
+- **Flask**: Slower, no built-in validation, manual async setup required
+- **Node.js/Express**: Python ecosystem needed for AI/ML libraries
+- **Go**: Steeper learning curve, limited AI/ML library support
+
+**Trade-off:** FastAPI is newer than Django/Flask, but ecosystem is mature enough for production use.
+
+---
+
+### Why PostgreSQL?
+
+**Chosen:** PostgreSQL 15 (relational database)
+
+**Pros:**
+- ✅ **ACID Compliance**: Strong consistency guarantees
+- ✅ **Rich Data Types**: JSONB, arrays, full-text search, extensions
+- ✅ **Scalability**: Read replicas, partitioning, horizontal scaling
+- ✅ **Maturity**: Battle-tested, used by Apple, Instagram, Spotify
+- ✅ **Open Source**: No vendor lock-in, active community
+- ✅ **PostGIS**: Ready for location-based features if needed
+
+**Alternatives Considered:**
+- **MongoDB**: Document store, but we need relational queries, transactions
+- **MySQL**: Less advanced features, weaker JSON support
+- **SQLite**: Not suitable for production, no concurrency
+- **DynamoDB**: AWS lock-in, expensive at scale, complex querying
+
+**Trade-off:** PostgreSQL requires more schema management than NoSQL, but provides better data integrity and query capabilities for our use case.
+
+---
+
+### Why Redis?
+
+**Chosen:** Redis 7 (in-memory cache & message broker)
+
+**Pros:**
+- ✅ **Speed**: Sub-millisecond latency for cached data
+- ✅ **Versatility**: Cache, sessions, message queue, pub/sub all in one
+- ✅ **Persistence**: AOF + RDB for data durability
+- ✅ **Clustering**: Redis Sentinel/Cluster for high availability
+- ✅ **Simple API**: Easy to use, well-documented
+- ✅ **Memory Efficient**: Optimized data structures, LRU eviction
+
+**Alternatives Considered:**
+- **Memcached**: No persistence, no clustering, fewer data types
+- **RabbitMQ**: Overkill for simple caching, separate service needed
+- **Kafka**: Too complex for caching, better for event streaming at scale
+- **ElastiCache**: AWS lock-in, more expensive
+
+**Trade-off:** Redis requires memory management, but provides excellent performance and versatility. Single Redis instance suitable for <10k users, cluster needed for larger scale.
+
+---
+
+### Why Next.js?
+
+**Chosen:** Next.js 14 (React framework)
+
+**Pros:**
+- ✅ **Server-Side Rendering (SSR)**: Better SEO, faster initial load
+- ✅ **Static Site Generation (SSG)**: Pre-render pages for performance
+- ✅ **API Routes**: Build API endpoints alongside frontend (not used, but available)
+- ✅ **Image Optimization**: Automatic image optimization and lazy loading
+- ✅ **Developer Experience**: Hot reload, TypeScript support, great DX
+- ✅ **Production Ready**: Used by Netflix, TikTok, Hulu
+- ✅ **React Ecosystem**: Access to all React libraries
+
+**Alternatives Considered:**
+- **React (CRA)**: No SSR, slower initial load, worse SEO
+- **Vue.js/Nuxt**: Smaller ecosystem, less corporate adoption
+- **Angular**: Too heavy, steeper learning curve, opinionated
+- **Svelte/SvelteKit**: Smaller ecosystem, fewer resources
+
+**Trade-off:** Next.js adds complexity over plain React, but provides better performance and SEO out of the box.
+
+---
+
+### Why Celery?
+
+**Chosen:** Celery (distributed task queue)
+
+**Pros:**
+- ✅ **Async Processing**: Offload long-running tasks (resume parsing, matching)
+- ✅ **Python Native**: Works seamlessly with FastAPI/Python stack
+- ✅ **Flexible**: Supports multiple brokers (Redis, RabbitMQ, SQS)
+- ✅ **Monitoring**: Flower for task monitoring
+- ✅ **Retry Logic**: Built-in retry, exponential backoff
+- ✅ **Scheduling**: Celery Beat for periodic tasks
+
+**Alternatives Considered:**
+- **Dramatiq**: Simpler, but smaller ecosystem, less mature
+- **RQ (Redis Queue)**: Simpler, but less features, no scheduling
+- **AWS SQS/Lambda**: Vendor lock-in, more expensive at scale
+- **Kubernetes Jobs**: Lower-level, more complex, requires K8s
+
+**Trade-off:** Celery adds complexity, but provides robust async task processing with retry, monitoring, and scheduling built-in.
+
+---
+
+### Why Ollama?
+
+**Chosen:** Ollama (local LLM inference)
+
+**Pros:**
+- ✅ **Zero Cost**: No API costs, unlimited usage
+- ✅ **Privacy**: Data never leaves your infrastructure
+- ✅ **Offline**: Works without internet (after model download)
+- ✅ **Fast**: Pre-downloaded models, optimized inference
+- ✅ **Simple**: Single command to pull models, easy API
+- ✅ **GPU Support**: Auto-uses GPU if available
+- ✅ **Production Ready**: Stable, actively maintained
+
+**Alternatives Considered:**
+- **OpenAI API**: Expensive ($0.03/1K tokens), rate limits, data privacy concerns
+- **Hugging Face Transformers**: Slower, more complex setup, larger memory footprint
+- **Local Transformers**: Requires more code, GPU setup complexity
+- **Anthropic Claude**: Expensive, API-only, no local option
+
+**Trade-off:** Ollama requires local resources (CPU/GPU), but provides cost savings, privacy, and no rate limits compared to cloud APIs.
+
+---
+
+### Why Docker & Docker Compose?
+
+**Chosen:** Docker Compose (containerization)
+
+**Pros:**
+- ✅ **Consistency**: Same environment across dev/staging/prod
+- ✅ **Isolation**: Services isolated, no dependency conflicts
+- ✅ **Easy Setup**: One command to start all services
+- ✅ **Portability**: Works on Windows, macOS, Linux
+- ✅ **Resource Management**: Easy to scale, configure resources
+- ✅ **Development**: Hot reload, easy debugging
+
+**Alternatives Considered:**
+- **Kubernetes**: Overkill for <10k users, complex setup
+- **Vagrant**: Slower, heavier, less modern
+- **Local Installation**: Dependency hell, platform-specific issues
+- **Cloud Services (ECS/EKS)**: More expensive, vendor lock-in for dev
+
+**Trade-off:** Docker adds abstraction layer, but provides consistency and easier deployment. Docker Compose suitable for single-server deployment, Kubernetes needed for larger scale.
+
+---
+
+### Overall Technology Stack Rationale
+
+**Theme:** **Production-Ready, Developer-Friendly, Cost-Effective**
+
+1. **FastAPI + PostgreSQL + Redis**: High-performance, scalable, battle-tested stack
+2. **Next.js**: Modern frontend with SSR for better UX and SEO
+3. **Celery**: Robust async processing for AI-heavy workloads
+4. **Ollama**: Cost-effective AI inference with privacy guarantees
+5. **Docker**: Consistent deployment across environments
+
+**Philosophy:** Choose technologies that balance performance, developer experience, and operational simplicity. Avoid over-engineering for current scale, but design for future growth.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -250,6 +421,400 @@ All API endpoints (except `/api/v1/auth/*`) require authentication:
 ```bash
 curl -H "Authorization: Bearer <token>" http://localhost:8000/api/v1/jobs/
 ```
+
+## 📋 API Contracts
+
+### Base URL
+```
+Production: https://api.hirelens.ai
+Development: http://localhost:8000
+```
+
+### Authentication
+
+All authenticated endpoints require a Bearer token in the Authorization header:
+```
+Authorization: Bearer <access_token>
+```
+
+**Token Types:**
+- **Access Token**: Short-lived (30 minutes default), used for API requests
+- **Refresh Token**: Long-lived (7 days default), used to refresh access token
+
+### Response Format
+
+**Success Response:**
+```json
+{
+  "data": { ... },
+  "message": "Success message (optional)"
+}
+```
+
+**Error Response:**
+```json
+{
+  "error": {
+    "message": "Human-readable error message",
+    "details": "Additional error details",
+    "type": "ErrorClassName"
+  }
+}
+```
+
+### HTTP Status Codes
+
+| Code | Meaning | Usage |
+|------|---------|-------|
+| 200 | OK | Successful GET/PUT/PATCH request |
+| 201 | Created | Successful POST request creating a resource |
+| 204 | No Content | Successful DELETE request |
+| 400 | Bad Request | Invalid request payload or parameters |
+| 401 | Unauthorized | Missing or invalid authentication token |
+| 403 | Forbidden | Insufficient permissions for the operation |
+| 404 | Not Found | Requested resource does not exist |
+| 422 | Unprocessable Entity | Validation error in request payload |
+| 429 | Too Many Requests | Rate limit exceeded |
+| 500 | Internal Server Error | Server-side error |
+
+### Rate Limiting
+
+- **Default**: 60 requests/minute, 1000 requests/hour per user
+- **Headers**: Rate limit info in response headers
+  - `X-RateLimit-Limit`: Request limit per window
+  - `X-RateLimit-Remaining`: Remaining requests in window
+  - `X-RateLimit-Reset`: Timestamp when limit resets
+
+### API Endpoints
+
+#### Authentication Endpoints (`/api/v1/auth`)
+
+**POST `/api/v1/auth/register`** - Register new user
+- **Request Body:**
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "secure_password",
+    "full_name": "John Doe",
+    "role_names": ["recruiter"]
+  }
+  ```
+- **Response:** `201 Created` - UserResponse
+- **Errors:** `400` (validation error), `409` (email exists)
+
+**POST `/api/v1/auth/login`** - Authenticate user
+- **Request Body:**
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "secure_password"
+  }
+  ```
+- **Response:** `200 OK` - Token (access_token, refresh_token, expires_in)
+- **Errors:** `401` (invalid credentials)
+
+**POST `/api/v1/auth/refresh`** - Refresh access token
+- **Request Body:**
+  ```json
+  {
+    "refresh_token": "refresh_token_string"
+  }
+  ```
+- **Response:** `200 OK` - Token (new access_token, refresh_token)
+- **Errors:** `401` (invalid refresh token)
+
+**GET `/api/v1/auth/me`** - Get current user info
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Response:** `200 OK` - UserResponse
+- **Errors:** `401` (unauthorized)
+
+---
+
+#### Resume Endpoints (`/api/v1/resumes`)
+
+**POST `/api/v1/resumes/upload`** - Upload and process resume
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Content-Type:** `multipart/form-data`
+- **Request Body:** Form data with `file` field (PDF only, max 10MB)
+- **Response:** `201 Created` - ResumeResponse
+  ```json
+  {
+    "id": 1,
+    "file_name": "resume.pdf",
+    "file_path": "/uploads/abc123.pdf",
+    "status": "processing",
+    "quality_score": null,
+    "created_at": "2024-01-01T00:00:00Z"
+  }
+  ```
+- **Errors:** `400` (invalid file type/size), `422` (not a resume), `500` (processing error)
+
+**GET `/api/v1/resumes`** - List all resumes
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Query Parameters:**
+  - `skip`: int (default: 0) - Pagination offset
+  - `limit`: int (default: 100, max: 1000) - Page size
+  - `status`: str (optional) - Filter by status: "processing", "completed", "failed"
+- **Response:** `200 OK` - List[ResumeResponse]
+
+**GET `/api/v1/resumes/{resume_id}`** - Get resume details
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Path Parameters:** `resume_id` (int) - Resume ID
+- **Response:** `200 OK` - ResumeDetailResponse (includes parsed data, kundali)
+- **Errors:** `404` (resume not found)
+
+**POST `/api/v1/resumes/{resume_id}/reprocess`** - Reprocess resume
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Path Parameters:** `resume_id` (int) - Resume ID
+- **Response:** `200 OK` - ResumeResponse (status: "processing")
+- **Errors:** `404` (resume not found), `400` (already processing)
+
+---
+
+#### Job Endpoints (`/api/v1/jobs`)
+
+**POST `/api/v1/jobs`** - Create job description
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Request Body:**
+  ```json
+  {
+    "title": "Senior Backend Engineer",
+    "company": "Tech Corp",
+    "department": "Engineering",
+    "raw_text": "We are looking for...",
+    "location": "San Francisco, CA",
+    "remote_allowed": true,
+    "employment_type": "full-time"
+  }
+  ```
+- **Response:** `201 Created` - JobDescriptionResponse
+- **Errors:** `400` (validation error), `401` (unauthorized)
+
+**GET `/api/v1/jobs`** - List job descriptions
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Query Parameters:**
+  - `skip`: int (default: 0)
+  - `limit`: int (default: 100, max: 1000)
+  - `is_active`: bool (optional) - Filter by active status
+- **Response:** `200 OK` - List[JobDescriptionResponse]
+
+**GET `/api/v1/jobs/{job_id}`** - Get job details
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Path Parameters:** `job_id` (int) - Job ID
+- **Response:** `200 OK` - JobDescriptionDetailResponse (includes parsed_data, raw_text)
+- **Errors:** `404` (job not found)
+
+**PUT `/api/v1/jobs/{job_id}`** - Update job description
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Path Parameters:** `job_id` (int) - Job ID
+- **Request Body:** JobDescriptionUpdate (all fields optional)
+- **Response:** `200 OK` - JobDescriptionResponse
+- **Errors:** `404` (job not found), `403` (not owner/admin)
+
+**DELETE `/api/v1/jobs/{job_id}`** - Delete (archive) job
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Path Parameters:** `job_id` (int) - Job ID
+- **Response:** `204 No Content`
+- **Errors:** `404` (job not found), `403` (not owner/admin)
+
+---
+
+#### Candidate Endpoints (`/api/v1/candidates`)
+
+**POST `/api/v1/candidates`** - Create candidate
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Request Body:**
+  ```json
+  {
+    "first_name": "John",
+    "last_name": "Doe",
+    "email": "john@example.com",
+    "phone": "+1234567890",
+    "linkedin_url": "https://linkedin.com/in/johndoe",
+    "portfolio_url": "https://johndoe.dev",
+    "resume_id": 1,
+    "notes": "Strong candidate"
+  }
+  ```
+- **Response:** `201 Created` - CandidateResponse (updates existing if resume_id already has candidate)
+- **Errors:** `400` (validation error), `404` (resume not found)
+
+**GET `/api/v1/candidates`** - List candidates
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Query Parameters:**
+  - `skip`: int (default: 0)
+  - `limit`: int (default: 100, max: 1000)
+  - `status`: str (optional) - Filter by status
+- **Response:** `200 OK` - List[CandidateResponse]
+
+**GET `/api/v1/candidates/{candidate_id}`** - Get candidate details
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Path Parameters:** `candidate_id` (int) - Candidate ID
+- **Response:** `200 OK` - CandidateResponse (includes kundali summary)
+- **Errors:** `404` (candidate not found)
+
+**PUT `/api/v1/candidates/{candidate_id}`** - Update candidate
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Path Parameters:** `candidate_id` (int) - Candidate ID
+- **Request Body:** CandidateUpdate (all fields optional)
+- **Response:** `200 OK` - CandidateResponse
+- **Errors:** `404` (candidate not found)
+
+**DELETE `/api/v1/candidates/{candidate_id}`** - Delete candidate
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Path Parameters:** `candidate_id` (int) - Candidate ID
+- **Response:** `204 No Content`
+- **Errors:** `404` (candidate not found), `403` (not owner/admin)
+
+---
+
+#### Matching Endpoints (`/api/v1/matching`)
+
+**POST `/api/v1/matching/match`** - Match candidate to job
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Query Parameters:**
+  - `candidate_id`: int (required) - Candidate ID
+  - `job_id`: int (required) - Job ID
+  - `force_recalculate`: bool (default: false) - Force recalculation even if match exists
+- **Response:** `201 Created` - MatchDetailResponse
+  ```json
+  {
+    "id": 1,
+    "candidate_id": 1,
+    "job_description_id": 1,
+    "overall_score": 85.5,
+    "confidence_level": "high",
+    "skill_match_score": 90.0,
+    "experience_score": 80.0,
+    "project_similarity_score": 85.0,
+    "domain_familiarity_score": 75.0,
+    "percentile_rank": 95.0,
+    "calculated_at": "2024-01-01T00:00:00Z",
+    "ai_explanation": {
+      "summary": "Strong match...",
+      "strengths": [...],
+      "weaknesses": [...],
+      "recommendations": [...],
+      "confidence_score": 0.85,
+      "reasoning_quality": "high"
+    }
+  }
+  ```
+- **Errors:** `404` (candidate/job not found), `400` (resume quality < 80%)
+
+**GET `/api/v1/matching/job/{job_id}/rankings`** - Get candidate rankings for job
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Path Parameters:** `job_id` (int) - Job ID
+- **Query Parameters:**
+  - `limit`: int (default: 100, max: 1000) - Maximum number of rankings
+- **Response:** `200 OK` - List[CandidateRankingResponse] (sorted by score, descending)
+- **Note:** This recalculates matches for all candidates (may take time)
+
+**GET `/api/v1/matching/match/{match_id}`** - Get match details
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Path Parameters:** `match_id` (int) - Match ID
+- **Response:** `200 OK` - MatchDetailResponse
+- **Errors:** `404` (match not found)
+
+**POST `/api/v1/matching/candidate/{candidate_id}/find-best-match`** - Find best job for candidate
+- **Headers:** `Authorization: Bearer <token>` (required)
+- **Path Parameters:** `candidate_id` (int) - Candidate ID
+- **Response:** `201 Created` - MatchDetailResponse (best matching job)
+- **Note:** Matches candidate to all active jobs, returns best match
+- **Errors:** `404` (candidate not found), `404` (no active jobs)
+
+---
+
+### Data Models
+
+**ResumeResponse:**
+```json
+{
+  "id": 1,
+  "file_name": "resume.pdf",
+  "file_path": "/uploads/abc123.pdf",
+  "status": "completed",
+  "quality_score": 85.5,
+  "created_at": "2024-01-01T00:00:00Z"
+}
+```
+
+**JobDescriptionResponse:**
+```json
+{
+  "id": 1,
+  "title": "Senior Backend Engineer",
+  "company": "Tech Corp",
+  "department": "Engineering",
+  "required_skills": ["Python", "FastAPI", "PostgreSQL"],
+  "nice_to_have_skills": ["Docker", "Kubernetes"],
+  "experience_years_required": 5,
+  "seniority_level": "senior",
+  "location": "San Francisco, CA",
+  "remote_allowed": true,
+  "employment_type": "full-time",
+  "is_active": true,
+  "created_at": "2024-01-01T00:00:00Z"
+}
+```
+
+**CandidateResponse:**
+```json
+{
+  "id": 1,
+  "first_name": "John",
+  "last_name": "Doe",
+  "email": "john@example.com",
+  "phone": "+1234567890",
+  "linkedin_url": "https://linkedin.com/in/johndoe",
+  "portfolio_url": "https://johndoe.dev",
+  "resume_id": 1,
+  "status": "active",
+  "notes": "Strong candidate",
+  "created_at": "2024-01-01T00:00:00Z"
+}
+```
+
+**MatchDetailResponse:**
+```json
+{
+  "id": 1,
+  "candidate_id": 1,
+  "job_description_id": 1,
+  "overall_score": 85.5,
+  "confidence_level": "high",
+  "skill_match_score": 90.0,
+  "experience_score": 80.0,
+  "project_similarity_score": 85.0,
+  "domain_familiarity_score": 75.0,
+  "percentile_rank": 95.0,
+  "calculated_at": "2024-01-01T00:00:00Z",
+  "ai_explanation": {
+    "summary": "Strong match with excellent technical skills...",
+    "strengths": [
+      "5+ years Python/FastAPI experience",
+      "Strong PostgreSQL knowledge",
+      "Relevant project experience"
+    ],
+    "weaknesses": [
+      "Limited Docker/Kubernetes experience",
+      "No experience with microservices at scale"
+    ],
+    "recommendations": [
+      "Consider providing Docker training",
+      "Excellent candidate for senior role"
+    ],
+    "confidence_score": 0.85,
+    "reasoning_quality": "high"
+  }
+}
+```
+
+### API Documentation
+
+Interactive API documentation available at:
+- **Swagger UI**: http://localhost:8000/api/docs
+- **ReDoc**: http://localhost:8000/api/redoc
 
 ## 📊 Core Features
 
@@ -685,13 +1250,438 @@ celery-worker:
   command: celery -A app.core.celery_app worker --loglevel=info --pool=solo
 ```
 
-## 📈 Scaling Strategy
+## 🤖 AI Decision Flow
 
-HireLens AI is designed to scale from 100 to 1 million users:
+### Resume Parsing Decision Flow
 
-- **100 users**: Single server, current architecture
-- **10k users**: Horizontal scaling, read replicas, Redis cluster
-- **1M users**: Microservices, multi-region, distributed database
+```
+Start: PDF Upload
+  │
+  ├─► File Validation
+  │     │
+  │     ├─► [PDF?] → NO → ❌ Reject (DOCX/DOC not allowed)
+  │     │
+  │     ├─► [Size < 10MB?] → NO → ❌ Reject
+  │     │
+  │     └─► [Valid Resume?] → Validate using text extraction
+  │                              │
+  │                              ├─► [Score < 20?] → ❌ Reject (Not a resume)
+  │                              │
+  │                              └─► [Score ≥ 20?] → ✅ Proceed
+  │
+  ├─► Text Extraction (Rule-based: pdfplumber/pypdf2)
+  │     │
+  │     └─► raw_text extracted
+  │
+  ├─► Async Task Queued (Celery)
+  │     │
+  │     └─► Worker picks up task
+  │
+  └─► AI Parsing Decision Tree
+        │
+        ├─► [Ollama Available?]
+        │     │
+        │     ├─► YES → [Text Model Available?]
+        │     │          │
+        │     │          ├─► YES → ✅ PRIMARY: Qwen2.5-7B-Instruct (Text-only)
+        │     │          │          │
+        │     │          │          └─► Use extracted raw_text (best reliability)
+        │     │          │
+        │     │          └─► NO → Try Vision Model
+        │     │                    │
+        │     │                    └─► [Vision Model Available?]
+        │     │                           │
+        │     │                           ├─► YES → Qwen2.5-VL (Vision, uses PDF base64)
+        │     │                           │
+        │     │                           └─► NO → Fallback Chain
+        │     │
+        │     └─► NO → Fallback Chain
+        │
+        └─► Fallback Chain (If Ollama fails)
+              │
+              ├─► [LayoutLMv3 Available?]
+              │     │
+              │     ├─► YES → Legacy Vision Parser
+              │     │          │
+              │     │          └─► PDF → Images → LayoutLMv3 → Section Detection → NER
+              │     │
+              │     └─► NO → [HURIDOCS Available?]
+              │                 │
+              │                 ├─► YES → HURIDOCS Layout Analysis (Port 5060)
+              │                 │
+              │                 └─► NO → [NER Models Available?]
+              │                           │
+              │                           ├─► YES → spaCy NER Parser (fast, CPU-friendly)
+              │                           │
+              │                           └─► NO → Rule-based Parser (pattern matching)
+              │
+        └─► Post-Processing
+              │
+              ├─► Skills Cleaning (remove company names from skills)
+              ├─► Email/Phone Regex Fallback
+              ├─► URL Normalization (add https://)
+              ├─► Experience Calculation (with overlap handling)
+              ├─► Quality Score Calculation
+              │
+              └─► Seniority Analysis
+                    │
+                    └─► [Ollama Available?]
+                          │
+                          ├─► YES → ✅ Ollama-based Elite Seniority Analyzer
+                          │          │
+                          │          ├─► Multi-dimensional analysis
+                          │          ├─► Red flag detection
+                          │          └─► Never returns "unknown"
+                          │
+                          └─► NO → Rule-based seniority detection
+```
+
+### Matching Decision Flow
+
+```
+Start: Match Request (candidate_id, job_id)
+  │
+  ├─► Check Existing Match
+  │     │
+  │     ├─► [Match Exists?] → YES → [force_recalculate?]
+  │     │                          │
+  │     │                          ├─► NO → ✅ Return Cached Result
+  │     │                          │
+  │     │                          └─► YES → Recalculate
+  │     │
+  │     └─► NO → Calculate New Match
+  │
+  ├─► Base Rule-Based Scoring (Fast)
+  │     │
+  │     ├─► Skill Matching (40% weight)
+  │     │     ├─► Case-insensitive matching
+  │     │     ├─► Alias detection (JS = JavaScript)
+  │     │     ├─► Fuzzy matching
+  │     │     ├─► Transferable skills (React → Vue)
+  │     │     └─► Missing skills penalty
+  │     │
+  │     ├─► Experience Alignment (25% weight)
+  │     │     ├─► Years vs required
+  │     │     ├─► Industry relevance
+  │     │     └─► Career progression
+  │     │
+  │     ├─► Project Similarity (20% weight)
+  │     │     ├─► Tech stack alignment
+  │     │     ├─► Complexity matching
+  │     │     └─► Domain relevance
+  │     │
+  │     └─► Domain & Culture Fit (15% weight)
+  │           ├─► Industry knowledge
+  │           ├─► Communication skills
+  │           └─► Adaptability
+  │
+  ├─► Deep Analysis Decision
+  │     │
+  │     ├─► [Ollama Available?]
+  │     │     │
+  │     │     ├─► YES → ✅ Ollama Deep Ranking Analysis
+  │     │     │          │
+  │     │     │          ├─► Comprehensive candidate-job analysis
+  │     │     │          ├─► Multi-dimensional scoring
+  │     │     │          ├─► Detailed breakdowns
+  │     │     │          ├─► Strengths/weaknesses extraction
+  │     │     │          └─► Recommendations generation
+  │     │     │
+  │     │     └─► NO → Use Base Scores Only
+  │     │
+  └─► AI Explanation Generation
+        │
+        ├─► [Ollama Analysis Available?]
+        │     │
+        │     ├─► YES → Use Ollama Analysis for Explanation
+        │     │
+        │     └─► NO → [AI_PROVIDER Setting?]
+        │                 │
+        │                 ├─► "openai" → OpenAI GPT-4 (if key available)
+        │                 │
+        │                 ├─► "huggingface" → Hugging Face Mistral-7B
+        │                 │
+        │                 └─► "auto" → Try OpenAI, fallback to Hugging Face
+        │
+        └─► Cache Result (Redis, 24h for embeddings, 1h for explanations)
+```
+
+## 📈 Scaling Strategy (100 → 1M Users)
+
+### Phase 1: Single Server (100-1,000 Users)
+
+**Current Architecture:**
+- Single FastAPI instance
+- Single PostgreSQL database
+- Single Redis instance
+- Single Celery worker
+- All services on one server
+
+**Capacity:**
+- ~100 concurrent users
+- ~1,000 resume uploads/day
+- ~5,000 matches/day
+- ~10GB database size
+
+**Cost:** ~$50-100/month (single VPS)
+
+**Limitations:**
+- No horizontal scaling
+- Single point of failure
+- Limited to one server's resources
+
+---
+
+### Phase 2: Horizontal Scaling (1,000-10,000 Users)
+
+**Changes Required:**
+
+1. **Load Balancing**
+   ```
+   Nginx/HAProxy → [FastAPI Instance 1, FastAPI Instance 2, ..., FastAPI Instance N]
+   ```
+   - Multiple FastAPI instances behind load balancer
+   - Session stickiness or stateless JWT tokens
+   - Health checks and auto-recovery
+
+2. **Database Scaling**
+   ```
+   Primary PostgreSQL → [Read Replica 1, Read Replica 2, ...]
+   ```
+   - Primary for writes
+   - 2-3 read replicas for read-heavy queries
+   - Connection pooling (PgBouncer)
+   - Database size: ~100GB
+
+3. **Redis Cluster**
+   ```
+   Redis Sentinel → [Redis Master, Redis Replica 1, Redis Replica 2]
+   ```
+   - Redis Cluster for high availability
+   - Separate Redis instances for cache, sessions, Celery
+   - Persistence enabled (AOF + RDB)
+
+4. **Celery Scaling**
+   ```
+   Redis Message Queue → [Worker Pool 1 (4 workers), Worker Pool 2 (4 workers), ...]
+   ```
+   - Multiple Celery worker pools
+   - Separate queues: `resume_processing`, `matching`, `embeddings`
+   - Auto-scaling based on queue length
+
+5. **File Storage**
+   ```
+   Local Storage → S3/MinIO Object Storage
+   ```
+   - Migrate to S3-compatible storage
+   - CDN for faster file access
+   - Automatic backups
+
+**Capacity:**
+- ~1,000 concurrent users
+- ~10,000 resume uploads/day
+- ~50,000 matches/day
+- ~100GB database size
+
+**Infrastructure:**
+- 3-5 API servers (2 CPU, 4GB RAM each)
+- Primary DB + 2 read replicas (4 CPU, 16GB RAM each)
+- Redis Cluster (3 nodes, 4GB RAM each)
+- 3-5 Celery worker servers (4 CPU, 8GB RAM each)
+
+**Cost:** ~$500-1,000/month
+
+---
+
+### Phase 3: Microservices (10,000-100,000 Users)
+
+**Service Decomposition:**
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  API Gateway (Kong/Traefik)                                  │
+│  - Routing, Rate Limiting, Authentication                    │
+└────────────────────┬─────────────────────────────────────────┘
+                     │
+     ┌───────────────┼───────────────┐
+     │               │               │
+     ↓               ↓               ↓
+┌─────────┐   ┌──────────┐   ┌──────────┐
+│ Resume  │   │  Job     │   │ Matching │
+│ Service │   │ Service  │   │ Service  │
+└─────────┘   └──────────┘   └──────────┘
+     │               │               │
+     └───────────────┼───────────────┘
+                     │
+     ┌───────────────┼───────────────┐
+     │               │               │
+     ↓               ↓               ↓
+┌─────────┐   ┌──────────┐   ┌──────────┐
+│Resume DB│   │ Job DB   │   │Match DB  │
+└─────────┘   └──────────┘   └──────────┘
+```
+
+**Service Details:**
+
+1. **Resume Service**
+   - Own database (PostgreSQL)
+   - Own cache (Redis)
+   - Handles resume upload, parsing, storage
+   - Async via Celery workers
+
+2. **Job Service**
+   - Own database (PostgreSQL)
+   - Own cache (Redis)
+   - Handles job creation, parsing, management
+
+3. **Matching Service**
+   - Own database (PostgreSQL, optimized for read-heavy)
+   - Own cache (Redis, for match results)
+   - Handles matching, ranking, explanations
+   - Communicates with Resume & Job services via gRPC/REST
+
+4. **AI Service (Shared)**
+   - Ollama cluster (multiple instances)
+   - Model serving layer
+   - Shared across all services
+
+5. **Shared Services**
+   - Authentication Service (JWT tokens)
+   - Notification Service (WebSockets)
+   - Analytics Service (Events tracking)
+
+**Communication:**
+- Service-to-service: gRPC (internal) or REST
+- Async: RabbitMQ/Kafka (message queue)
+- Service Discovery: Consul/etcd
+
+**Capacity:**
+- ~10,000 concurrent users
+- ~100,000 resume uploads/day
+- ~500,000 matches/day
+- ~1TB database size (distributed)
+
+**Infrastructure:**
+- Kubernetes cluster (15-20 nodes)
+- API Gateway: 3 instances
+- Each microservice: 3-5 instances
+- Database per service: Primary + 2 replicas
+- Redis Cluster: 5-7 nodes
+
+**Cost:** ~$5,000-10,000/month
+
+---
+
+### Phase 4: Multi-Region (100,000-1M Users)
+
+**Global Architecture:**
+
+```
+Region 1 (US East)          Region 2 (EU)              Region 3 (APAC)
+┌──────────────┐           ┌──────────────┐           ┌──────────────┐
+│ Full Stack   │           │ Full Stack   │           │ Full Stack   │
+│ - All Services│           │ - All Services│           │ - All Services│
+│ - Read Replicas│          │ - Read Replicas│          │ - Read Replicas│
+└──────┬───────┘           └──────┬───────┘           └──────┬───────┘
+       │                          │                          │
+       └──────────────┬───────────┴───────────┬──────────────┘
+                      │                       │
+              ┌───────▼────────┐      ┌───────▼────────┐
+              │ Global Load    │      │ Global Database│
+              │ Balancer       │      │ (Primary)      │
+              │ (GeoDNS)       │      │ Cross-Region   │
+              └────────────────┘      │ Replication    │
+                                      └────────────────┘
+```
+
+**Key Features:**
+
+1. **Multi-Region Deployment**
+   - Full stack in 3+ regions
+   - Users routed to nearest region
+   - Active-active configuration
+
+2. **Global Database**
+   - Primary in one region
+   - Cross-region read replicas
+   - Write conflicts resolved via vector clocks
+   - Eventual consistency for reads
+
+3. **CDN & Edge Caching**
+   - CloudFront/Cloudflare for static assets
+   - Edge caching for API responses
+   - Reduced latency worldwide
+
+4. **Event-Driven Architecture**
+   - Kafka/RabbitMQ for cross-region messaging
+   - Event sourcing for audit trails
+   - CQRS for read/write separation
+
+5. **Monitoring & Observability**
+   - Distributed tracing (Jaeger/Zipkin)
+   - Centralized logging (ELK Stack)
+   - Metrics (Prometheus + Grafana)
+   - APM (New Relic/Datadog)
+
+**Capacity:**
+- ~100,000 concurrent users globally
+- ~1M resume uploads/day
+- ~5M matches/day
+- ~10TB+ database size (distributed)
+
+**Infrastructure:**
+- 3 regions × 20-30 Kubernetes nodes each
+- Global load balancer (GeoDNS)
+- Database replication (PostgreSQL streaming replication)
+- Kafka cluster for event streaming
+- Multi-region Redis (Redis Sentinel)
+
+**Cost:** ~$50,000-100,000/month
+
+---
+
+### Migration Path
+
+**Step 1: Prepare for Scaling (Week 1-2)**
+- [ ] Add database read replicas
+- [ ] Implement connection pooling
+- [ ] Add Redis cluster
+- [ ] Separate Celery queues
+- [ ] Load testing
+
+**Step 2: Horizontal Scaling (Week 3-4)**
+- [ ] Set up load balancer
+- [ ] Deploy multiple API instances
+- [ ] Scale Celery workers
+- [ ] Migrate to S3 storage
+- [ ] Monitoring & alerting
+
+**Step 3: Microservices Migration (Month 2-3)**
+- [ ] Extract Resume Service
+- [ ] Extract Job Service
+- [ ] Extract Matching Service
+- [ ] Implement service discovery
+- [ ] Update API Gateway
+
+**Step 4: Multi-Region (Month 4-6)**
+- [ ] Deploy to second region
+- [ ] Set up database replication
+- [ ] Configure GeoDNS
+- [ ] Cross-region testing
+- [ ] Disaster recovery plan
+
+---
+
+### Performance Targets
+
+| Metric | 100 Users | 10K Users | 1M Users |
+|--------|-----------|-----------|----------|
+| API Response Time | <200ms | <200ms | <200ms |
+| Resume Processing | <30s | <30s | <30s |
+| Match Calculation | <5s | <5s | <5s |
+| Database Query | <50ms | <100ms | <150ms |
+| Cache Hit Rate | >80% | >85% | >90% |
+| Uptime | 99% | 99.9% | 99.99% |
 
 ## 🛠️ Development
 
