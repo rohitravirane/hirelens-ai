@@ -311,25 +311,40 @@ Analysis:"""
         job_data: Dict[str, Any],
         scores: Dict[str, float],
     ) -> Dict[str, Any]:
-        """Fallback explanation when model fails"""
-        candidate_skills = set(candidate_data.get("skills", []))
-        required_skills = set(job_data.get("required_skills", []))
-        nice_to_have_skills = set(job_data.get("nice_to_have_skills", []))
+        """Fallback explanation when model fails - uses smart skill matching"""
+        from app.matching.scoring import scoring_engine
         
-        matched_required = candidate_skills.intersection(required_skills)
-        matched_nice = candidate_skills.intersection(nice_to_have_skills)
-        missing_required = required_skills - candidate_skills
+        candidate_skills_list = candidate_data.get("skills", []) or []
+        required_skills_list = job_data.get("required_skills", []) or []
+        nice_to_have_skills_list = job_data.get("nice_to_have_skills", []) or []
         
-        strengths = [
-            f"Has {len(matched_required)} out of {len(required_skills)} required skills",
-            f"Matches {len(matched_nice)} nice-to-have skills",
-        ]
+        # Use smart matching to find actual matches
+        matched_required, _ = scoring_engine._find_matching_skills(
+            candidate_skills_list,
+            required_skills_list
+        )
+        
+        matched_nice, _ = scoring_engine._find_matching_skills(
+            candidate_skills_list,
+            nice_to_have_skills_list
+        )
+        
+        # Find missing required skills
+        missing_required = set(required_skills_list) - matched_required
+        
+        strengths = []
+        if len(required_skills_list) > 0:
+            strengths.append(f"Has {len(matched_required)} out of {len(required_skills_list)} required skills")
+        if len(nice_to_have_skills_list) > 0:
+            strengths.append(f"Matches {len(matched_nice)} nice-to-have skills")
         if matched_required:
-            strengths.append(f"Key skills: {', '.join(list(matched_required)[:3])}")
+            matched_skill_names = list(matched_required)[:5]
+            strengths.append(f"Key matched skills: {', '.join(matched_skill_names)}")
         
         weaknesses = []
         if missing_required:
-            weaknesses.append(f"Missing required skills: {', '.join(list(missing_required)[:3])}")
+            missing_skill_names = list(missing_required)[:5]
+            weaknesses.append(f"Missing {len(missing_required)} required skills: {', '.join(missing_skill_names)}")
         
         experience_diff = candidate_data.get("experience_years", 0) - job_data.get("experience_years_required", 0)
         if experience_diff < 0:
@@ -337,12 +352,19 @@ Analysis:"""
         elif experience_diff > 0:
             strengths.append(f"Has {experience_diff} more years of experience than required")
         
+        # Add skill match score context
+        skill_score = scores.get("skill_match_score", 0)
+        if skill_score >= 70:
+            strengths.append(f"Strong skill alignment ({skill_score:.0f}% match)")
+        elif skill_score < 50:
+            weaknesses.append(f"Limited skill overlap ({skill_score:.0f}% match)")
+        
         return {
             "summary": f"Candidate has an overall match score of {scores.get('overall_score', 0):.1f}/100. "
-                      f"Key strengths include matching {len(matched_required)} required skills. "
+                      f"Key strengths include matching {len(matched_required)} out of {len(required_skills_list)} required skills. "
                       f"Main gaps: {len(missing_required)} missing required skills.",
-            "strengths": strengths,
-            "weaknesses": weaknesses,
+            "strengths": strengths[:5] if strengths else ["Candidate shows potential with relevant background"],
+            "weaknesses": weaknesses[:5] if weaknesses else [],
             "recommendations": [
                 "Review candidate's portfolio for practical experience",
                 "Consider skills transferability from similar technologies",

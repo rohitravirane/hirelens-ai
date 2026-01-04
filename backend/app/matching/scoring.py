@@ -1,8 +1,10 @@
 """
 Scoring engine for candidate-job matching
 """
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Set, Tuple
 import structlog
+import re
+from difflib import SequenceMatcher
 
 from app.ai_engine.service import ai_engine
 
@@ -18,6 +20,82 @@ class ScoringEngine:
         "experience": 0.25,
         "project_similarity": 0.20,
         "domain_familiarity": 0.15,
+    }
+    
+    # Common skill aliases and variations
+    SKILL_ALIASES = {
+        "js": ["javascript", "ecmascript"],
+        "javascript": ["js", "ecmascript"],
+        "react": ["reactjs", "react.js", "reactjs"],
+        "reactjs": ["react", "react.js"],
+        "react.js": ["react", "reactjs"],
+        "node": ["nodejs", "node.js"],
+        "nodejs": ["node", "node.js"],
+        "node.js": ["node", "nodejs"],
+        "vue": ["vuejs", "vue.js"],
+        "vuejs": ["vue", "vue.js"],
+        "vue.js": ["vue", "vuejs"],
+        "angular": ["angularjs", "angular.js"],
+        "angularjs": ["angular", "angular.js"],
+        "angular.js": ["angular", "angularjs"],
+        "typescript": ["ts"],
+        "ts": ["typescript"],
+        "html": ["html5"],
+        "html5": ["html"],
+        "css": ["css3"],
+        "css3": ["css"],
+        "python": ["py"],
+        "py": ["python"],
+        "java": ["spring", "spring framework", "spring boot", "hibernate", "j2ee", "jee"],
+        "spring": ["java", "spring framework", "spring boot"],
+        "spring framework": ["java", "spring", "spring boot"],
+        "spring boot": ["java", "spring", "spring framework"],
+        "hibernate": ["java"],
+        "j2ee": ["java"],
+        "jee": ["java"],
+        "machine learning": ["ml", "machinelearning"],
+        "ml": ["machine learning", "machinelearning"],
+        "artificial intelligence": ["ai"],
+        "ai": ["artificial intelligence"],
+        "aws": ["amazon web services"],
+        "amazon web services": ["aws"],
+        "gcp": ["google cloud platform", "google cloud"],
+        "google cloud platform": ["gcp", "google cloud"],
+        "google cloud": ["gcp", "google cloud platform"],
+        "azure": ["microsoft azure"],
+        "microsoft azure": ["azure"],
+        "kubernetes": ["k8s"],
+        "k8s": ["kubernetes"],
+        "docker": ["docker container"],
+        "postgresql": ["postgres", "pg"],
+        "postgres": ["postgresql", "pg"],
+        "pg": ["postgresql", "postgres"],
+        "mongodb": ["mongo"],
+        "mongo": ["mongodb"],
+        "redis": ["redis cache"],
+        "git": ["git version control"],
+        "rest": ["rest api", "restful api", "rest apis"],
+        "rest api": ["rest", "restful api", "rest apis"],
+        "rest apis": ["rest", "rest api", "restful api"],
+        "restful api": ["rest", "rest api", "rest apis"],
+        "graphql": ["graph ql"],
+        "graph ql": ["graphql"],
+        "sql": ["mysql", "postgresql", "postgres", "sql server", "mssql", "oracle"],
+        "mysql": ["sql"],
+        "mssql": ["sql", "sql server"],
+        "sql server": ["sql", "mssql"],
+        "oracle": ["sql"],
+        "scrum": ["scrum/agile", "agile", "scrum agile"],
+        "agile": ["scrum", "scrum/agile", "scrum agile"],
+        "scrum/agile": ["scrum", "agile"],
+        "scrum agile": ["scrum", "agile"],
+        "net": [".net", "dotnet", "dot net"],
+        ".net": ["net", "dotnet", "dot net"],
+        "dotnet": ["net", ".net", "dot net"],
+        "dot net": ["net", ".net", "dotnet"],
+        "next.js": ["nextjs", "next js"],
+        "nextjs": ["next.js", "next js"],
+        "next js": ["next.js", "nextjs"],
     }
     
     def calculate_match_score(
@@ -56,33 +134,193 @@ class ScoringEngine:
         
         return scores
     
+    def _normalize_skill(self, skill: str) -> str:
+        """Normalize a skill name for matching"""
+        if not skill:
+            return ""
+        
+        # Convert to lowercase and strip whitespace
+        normalized = skill.lower().strip()
+        
+        # Remove special characters except spaces and hyphens
+        normalized = re.sub(r'[^\w\s-]', '', normalized)
+        
+        # Replace multiple spaces/hyphens with single space
+        normalized = re.sub(r'[\s-]+', ' ', normalized)
+        
+        # Handle common plural/singular forms for better matching
+        # Remove trailing 's' for common tech terms (but be careful)
+        # Only do this for known tech terms to avoid false positives
+        tech_plurals = {
+            'apis': 'api',
+            'frameworks': 'framework',
+            'tools': 'tool',
+            'languages': 'language',
+        }
+        words = normalized.split()
+        if len(words) == 2 and words[-1] in tech_plurals:
+            # e.g., "rest apis" -> "rest api"
+            normalized = f"{words[0]} {tech_plurals[words[-1]]}"
+        elif normalized.endswith('s') and len(normalized) > 4:
+            # For single-word skills ending in 's', try both forms
+            # We'll handle this in matching logic, not here
+            pass
+        
+        # Remove leading/trailing spaces
+        normalized = normalized.strip()
+        
+        return normalized
+    
+    def _get_skill_variations(self, skill: str) -> Set[str]:
+        """Get all variations and aliases of a skill"""
+        normalized = self._normalize_skill(skill)
+        variations = {normalized}
+        
+        # Add aliases
+        if normalized in self.SKILL_ALIASES:
+            for alias in self.SKILL_ALIASES[normalized]:
+                variations.add(self._normalize_skill(alias))
+        
+        # Also check reverse lookup (if alias is the skill, add main skill)
+        for main_skill, aliases in self.SKILL_ALIASES.items():
+            if normalized in [self._normalize_skill(a) for a in aliases]:
+                variations.add(self._normalize_skill(main_skill))
+                variations.update([self._normalize_skill(a) for a in aliases])
+        
+        return variations
+    
+    def _skills_match(self, skill1: str, skill2: str, threshold: float = 0.85) -> bool:
+        """
+        Check if two skills match using smart matching
+        Returns True if skills match (exact, alias, or fuzzy)
+        """
+        # Normalize both skills
+        norm1 = self._normalize_skill(skill1)
+        norm2 = self._normalize_skill(skill2)
+        
+        # Exact match after normalization
+        if norm1 == norm2:
+            return True
+        
+        # Check if they're aliases (this is the most reliable method)
+        variations1 = self._get_skill_variations(skill1)
+        variations2 = self._get_skill_variations(skill2)
+        
+        if variations1.intersection(variations2):
+            return True
+        
+        # Fuzzy matching for similar skills (but be careful with short names)
+        similarity = SequenceMatcher(None, norm1, norm2).ratio()
+        if similarity >= threshold:
+            # Additional check: don't match if one is clearly a substring of a longer different word
+            # e.g., "java" should NOT match "javascript" even if similarity is high
+            if len(norm1) >= 4 and len(norm2) >= 4:  # Both must be at least 4 chars for fuzzy match
+                return True
+        
+        # Handle plural/singular variations
+        # e.g., "rest apis" vs "rest api"
+        norm1_singular = norm1.rstrip('s') if norm1.endswith('s') and len(norm1) > 3 else norm1
+        norm2_singular = norm2.rstrip('s') if norm2.endswith('s') and len(norm2) > 3 else norm2
+        if norm1_singular == norm2 or norm2_singular == norm1 or norm1_singular == norm2_singular:
+            # But avoid false positives like "j" matching "js"
+            if min(len(norm1_singular), len(norm2_singular)) >= 3:
+                return True
+        
+        # Check if one skill contains the other (for compound skills)
+        # But be very strict to avoid false positives like "java" in "javascript"
+        if norm1 in norm2 or norm2 in norm1:
+            shorter = min(len(norm1), len(norm2))
+            longer = max(len(norm1), len(norm2))
+            # Only match if:
+            # 1. Shorter is at least 4 chars (avoid "js" matching "javascript")
+            # 2. The longer one is not much longer (avoid "java" matching "javascript")
+            if shorter >= 4 and (longer - shorter) <= 3:
+                # Additional check: don't match if it's a known false positive
+                false_positives = [
+                    ("java", "javascript"),
+                    ("js", "javascript"),
+                    ("net", "internet"),
+                    ("go", "golang"),
+                ]
+                for fp1, fp2 in false_positives:
+                    if (norm1 == fp1 and norm2 == fp2) or (norm1 == fp2 and norm2 == fp1):
+                        return False
+                return True
+        
+        return False
+    
+    def _find_matching_skills(
+        self,
+        candidate_skills: List[str],
+        required_skills: List[str]
+    ) -> Tuple[Set[str], Set[str]]:
+        """
+        Find matching skills between candidate and required skills using smart matching
+        Returns: (matched_required_skills, matched_candidate_skills)
+        """
+        matched_required = set()
+        matched_candidate = set()
+        
+        # Handle None or empty cases
+        if not candidate_skills or not required_skills:
+            return matched_required, matched_candidate
+        
+        # Ensure we're working with lists of strings
+        candidate_skills = [str(s) for s in candidate_skills if s]
+        required_skills = [str(s) for s in required_skills if s]
+        
+        for req_skill in required_skills:
+            if not req_skill:  # Skip empty strings
+                continue
+            for cand_skill in candidate_skills:
+                if not cand_skill:  # Skip empty strings
+                    continue
+                if self._skills_match(req_skill, cand_skill):
+                    matched_required.add(req_skill)
+                    matched_candidate.add(cand_skill)
+                    break  # Each required skill matches at most one candidate skill
+        
+        return matched_required, matched_candidate
+    
     def _calculate_skill_match(
         self,
         candidate_data: Dict[str, Any],
         job_data: Dict[str, Any],
     ) -> float:
-        """Calculate skill match score (0-100)"""
-        candidate_skills = set(skill.lower() for skill in candidate_data.get("skills", []))
-        required_skills = set(skill.lower() for skill in job_data.get("required_skills", []))
-        nice_to_have_skills = set(skill.lower() for skill in job_data.get("nice_to_have_skills", []))
+        """Calculate skill match score (0-100) using smart matching"""
+        candidate_skills_list = candidate_data.get("skills", []) or []
+        required_skills_list = job_data.get("required_skills", []) or []
+        nice_to_have_skills_list = job_data.get("nice_to_have_skills", []) or []
         
-        if not required_skills:
+        if not required_skills_list:
             # If no required skills specified, give base score
             return 50.0
         
-        # Required skills match (70% weight)
-        matched_required = candidate_skills.intersection(required_skills)
-        required_score = (len(matched_required) / len(required_skills)) * 70 if required_skills else 0
+        # Find matching required skills using smart matching
+        matched_required, _ = self._find_matching_skills(
+            candidate_skills_list,
+            required_skills_list
+        )
         
-        # Nice-to-have skills match (30% weight)
-        matched_nice = candidate_skills.intersection(nice_to_have_skills)
-        nice_score = (len(matched_nice) / len(nice_to_have_skills)) * 30 if nice_to_have_skills else 0
+        # Calculate required skills score (70% weight)
+        required_score = (len(matched_required) / len(required_skills_list)) * 70 if required_skills_list else 0
+        
+        # Find matching nice-to-have skills
+        matched_nice, _ = self._find_matching_skills(
+            candidate_skills_list,
+            nice_to_have_skills_list
+        )
+        
+        # Calculate nice-to-have skills score (30% weight)
+        nice_score = (len(matched_nice) / len(nice_to_have_skills_list)) * 30 if nice_to_have_skills_list else 0
         
         total_score = required_score + nice_score
         
         # Bonus for having extra relevant skills
-        if len(candidate_skills) > len(required_skills):
-            bonus = min(10, (len(candidate_skills) - len(required_skills)) * 2)
+        candidate_skill_count = len(set(self._normalize_skill(s) for s in candidate_skills_list))
+        required_skill_count = len(required_skills_list)
+        if candidate_skill_count > required_skill_count:
+            bonus = min(10, (candidate_skill_count - required_skill_count) * 2)
             total_score = min(100, total_score + bonus)
         
         return round(total_score, 2)

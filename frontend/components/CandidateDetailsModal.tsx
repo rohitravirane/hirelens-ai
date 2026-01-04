@@ -162,13 +162,13 @@ export default function CandidateDetailsModal({ isOpen, onClose, candidateId }: 
         ) : candidate ? (
           <>
             {/* Sticky Header */}
-            <div className="sticky top-0 bg-white z-10 border-b border-gray-200 px-6 pt-6 pb-4">
-              <div className="flex justify-between items-start">
-                <div className="flex-1 pr-4">
-                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+            <div className="sticky top-0 bg-white z-10 border-b border-gray-200 px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4">
+              <div className="flex justify-between items-start gap-3">
+                <div className="flex-1 min-w-0 pr-2 sm:pr-4">
+                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2 break-words">
                     {candidate.first_name} {candidate.last_name}
                   </h2>
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-600">
                     {candidate.email && (
                       <span className="font-medium">{candidate.email}</span>
                     )}
@@ -208,7 +208,7 @@ export default function CandidateDetailsModal({ isOpen, onClose, candidateId }: 
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto px-6">
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6">
               {/* Quality Score Indicator */}
               {candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && (
                 <div className="mb-6 pt-4">

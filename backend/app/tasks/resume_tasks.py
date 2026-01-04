@@ -9,7 +9,8 @@ from app.models.resume import Resume, ResumeVersion
 from app.resumes.parser import ResumeParser
 from app.resumes.ai_parser import ai_parser
 from app.resumes.resume_validator import ResumeValidator
-from typing import Dict, Any
+from app.resumes.seniority_analyzer import elite_seniority_analyzer
+from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 import structlog
 import re
@@ -17,6 +18,34 @@ import re
 logger = structlog.get_logger()
 parser = ResumeParser()
 resume_validator = ResumeValidator()
+
+def _flatten_skills(skills_dict: Dict[str, Any]) -> List[str]:
+    """Flatten skills dictionary to list"""
+    if isinstance(skills_dict, dict):
+        flattened = []
+        for category, skill_list in skills_dict.items():
+            if isinstance(skill_list, list):
+                flattened.extend(skill_list)
+            elif skill_list:
+                flattened.append(skill_list)
+        return flattened
+    elif isinstance(skills_dict, list):
+        return skills_dict
+    return []
+
+def _flatten_skills(skills_dict: Dict[str, Any]) -> List[str]:
+    """Flatten skills dictionary to list"""
+    if isinstance(skills_dict, dict):
+        flattened = []
+        for category, skill_list in skills_dict.items():
+            if isinstance(skill_list, list):
+                flattened.extend(skill_list)
+            elif skill_list:
+                flattened.append(skill_list)
+        return flattened
+    elif isinstance(skills_dict, list):
+        return skills_dict
+    return []
 
 
 @celery_app.task(bind=True, max_retries=3, soft_time_limit=600, time_limit=900)
@@ -365,7 +394,37 @@ def _create_candidate_from_kundali(db: Session, resume_id: int, kundali: Dict[st
     online_presence = kundali.get("online_presence", {})
     skills = kundali.get("skills", {})
     personality = kundali.get("personality_inference", {})
-    seniority = kundali.get("seniority_assessment", {})
+    
+    # Use elite seniority analyzer for world-class detection (never returns unknown)
+    seniority_analysis = elite_seniority_analyzer.analyze_seniority(
+        resume_data={
+            "experience_years": kundali.get("total_experience_years", 0),
+            "experience": kundali.get("experience", []),
+            "projects": kundali.get("projects", []),
+            "education": kundali.get("education", []),
+            "skills": _flatten_skills(kundali.get("skills", {})),
+        },
+        raw_text=raw_text or ""
+    )
+    
+    # Extract seniority from elite analysis (never unknown)
+    seniority = {
+        "level": seniority_analysis.get("seniority_level", "mid"),  # Default to mid, never unknown
+        "confidence": seniority_analysis.get("confidence", 0.7),
+        "evidence": seniority_analysis.get("evidence", []),
+        "red_flags": seniority_analysis.get("red_flags", []),
+        "positive_signals": seniority_analysis.get("positive_signals", []),
+        "detailed_analysis": seniority_analysis.get("detailed_analysis", {}),
+        "reasoning": seniority_analysis.get("reasoning", "")
+    }
+    
+    # Update kundali with elite analysis
+    kundali["seniority_assessment"] = seniority
+    
+    # Also update red_flags in kundali with seniority red flags
+    existing_red_flags = kundali.get("red_flags", [])
+    seniority_red_flags = [rf.get("description", "") for rf in seniority.get("red_flags", [])]
+    kundali["red_flags"] = list(set(existing_red_flags + seniority_red_flags))  # Merge and deduplicate
     
     # Extract email with fallback to regex if AI missed it
     email = identity.get("email", "unknown")
@@ -456,7 +515,7 @@ def _create_candidate_from_kundali(db: Session, resume_id: int, kundali: Dict[st
             skills_soft=skills.get("soft_skills", []),
             certifications_data=kundali.get("certifications", []),
             languages=kundali.get("languages", []),
-            seniority_level=seniority.get("level", "unknown"),
+            seniority_level=seniority.get("level", "mid"),  # Never unknown - default to mid
             seniority_confidence=seniority.get("confidence", 0.0),
             seniority_evidence=seniority.get("evidence", []),
             work_style=personality.get("work_style", "unknown"),
@@ -494,7 +553,7 @@ def _create_candidate_from_kundali(db: Session, resume_id: int, kundali: Dict[st
         kundali_record.skills_soft = skills.get("soft_skills", [])
         kundali_record.certifications_data = kundali.get("certifications", [])
         kundali_record.languages = kundali.get("languages", [])
-        kundali_record.seniority_level = seniority.get("level", kundali_record.seniority_level)
+        kundali_record.seniority_level = seniority.get("level", "mid") if seniority.get("level") != "unknown" else "mid"  # Never unknown
         kundali_record.seniority_confidence = seniority.get("confidence", kundali_record.seniority_confidence)
         kundali_record.seniority_evidence = seniority.get("evidence", [])
         kundali_record.work_style = personality.get("work_style", kundali_record.work_style)

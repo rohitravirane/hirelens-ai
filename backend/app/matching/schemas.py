@@ -42,10 +42,29 @@ class MatchDetailResponse(MatchResultResponse):
     ai_explanation: Optional[AIExplanationResponse]
 
 
+class CandidateKundaliSummaryResponse(BaseModel):
+    """Candidate Kundali summary for rankings"""
+    name: Optional[str] = None
+    total_experience_years: Optional[float] = None
+    seniority_level: Optional[str] = None
+    skills_frontend: Optional[List[str]] = None
+    skills_backend: Optional[List[str]] = None
+    skills_devops: Optional[List[str]] = None
+    skills_ai_ml: Optional[List[str]] = None
+    skills_tools: Optional[List[str]] = None
+    skills_soft: Optional[List[str]] = None
+    summary: Optional[str] = None
+    overall_confidence_score: Optional[float] = None
+    
+    class Config:
+        from_attributes = True
+
+
 class CandidateRankingResponse(BaseModel):
     """Candidate ranking response"""
     candidate_id: int
     candidate_name: Optional[str]
     candidate_email: Optional[str]
     match_result: MatchDetailResponse
+    kundali: Optional[CandidateKundaliSummaryResponse] = None
 

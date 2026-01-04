@@ -52,11 +52,11 @@ export default function JobDetailsModal({ isOpen, onClose, jobId, onViewRankings
         ) : job ? (
           <>
             {/* Sticky Header */}
-            <div className="sticky top-0 bg-white z-10 border-b border-gray-200 px-6 pt-6 pb-4">
-              <div className="flex justify-between items-start">
-                <div className="flex-1 pr-4">
-                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{job.title}</h2>
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+            <div className="sticky top-0 bg-white z-10 border-b border-gray-200 px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4">
+              <div className="flex justify-between items-start gap-3">
+                <div className="flex-1 min-w-0 pr-2 sm:pr-4">
+                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2 break-words">{job.title}</h2>
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-600">
                     {job.company && (
                       <span className="font-medium">{job.company}</span>
                     )}
@@ -86,7 +86,7 @@ export default function JobDetailsModal({ isOpen, onClose, jobId, onViewRankings
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto px-6">
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6">
 
               {/* Job Info Badges */}
               <div className="flex flex-wrap gap-2 mb-6 pt-4">
@@ -115,12 +115,12 @@ export default function JobDetailsModal({ isOpen, onClose, jobId, onViewRankings
               {/* Required Skills */}
               {job.required_skills && job.required_skills.length > 0 && (
                 <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Required Skills</h3>
-                  <div className="flex flex-wrap gap-2">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3">Required Skills</h3>
+                  <div className="flex flex-wrap gap-1.5 sm:gap-2">
                     {job.required_skills.map((skill: string, i: number) => (
                       <span
                         key={i}
-                        className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
+                        className="px-2 sm:px-3 py-0.5 sm:py-1 bg-blue-100 text-blue-800 text-xs sm:text-sm rounded-full break-words"
                       >
                         {skill}
                       </span>
@@ -132,12 +132,12 @@ export default function JobDetailsModal({ isOpen, onClose, jobId, onViewRankings
               {/* Nice to Have Skills */}
               {job.nice_to_have_skills && job.nice_to_have_skills.length > 0 && (
                 <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Nice to Have Skills</h3>
-                  <div className="flex flex-wrap gap-2">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3">Nice to Have Skills</h3>
+                  <div className="flex flex-wrap gap-1.5 sm:gap-2">
                     {job.nice_to_have_skills.map((skill: string, i: number) => (
                       <span
                         key={i}
-                        className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full"
+                        className="px-2 sm:px-3 py-0.5 sm:py-1 bg-gray-100 text-gray-700 text-xs sm:text-sm rounded-full break-words"
                       >
                         {skill}
                       </span>

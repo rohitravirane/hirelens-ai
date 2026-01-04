@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 import structlog
 
 from app.matching.scoring import scoring_engine
+from app.matching.ollama_ranking import ollama_ranking_engine
 from app.ai_engine.service import ai_engine
 from app.core.config import settings
 from app.models.resume import ResumeVersion
@@ -68,9 +69,21 @@ class MatchingService:
             raise ValueError(f"Job {job_id} not found")
         
         # Prepare data for scoring
+        # Flatten skills if they're stored as a dictionary (e.g., {'technical': [...], 'tools': [...]})
+        skills_list = resume_version.skills or []
+        if isinstance(skills_list, dict):
+            # Flatten dictionary of skills into a single list
+            flattened_skills = []
+            for category, skill_list in skills_list.items():
+                if isinstance(skill_list, list):
+                    flattened_skills.extend(skill_list)
+                elif skill_list:  # Handle single string values
+                    flattened_skills.append(skill_list)
+            skills_list = flattened_skills
+        
         candidate_data = {
             "id": candidate.id,
-            "skills": resume_version.skills or [],
+            "skills": skills_list,
             "experience_years": resume_version.experience_years,
             "experience": resume_version.experience or [],
             "projects": resume_version.projects or [],
@@ -87,11 +100,46 @@ class MatchingService:
             "raw_text": job.raw_text or "",
         }
         
-        # Calculate scores
-        scores = scoring_engine.calculate_match_score(candidate_data, job_data)
+        # Step 1: Calculate base scores using rule-based engine
+        base_scores = scoring_engine.calculate_match_score(candidate_data, job_data)
         
-        # Generate AI explanation
-        explanation_data = ai_engine.generate_explanation(candidate_data, job_data, scores)
+        # Step 2: Generate deep ranking analysis using Ollama (world-class matching)
+        ollama_analysis = ollama_ranking_engine.generate_ranking_analysis(
+            candidate_data, job_data, base_scores
+        )
+        
+        # Step 3: Use Ollama scores if available, otherwise fallback to base scores
+        if ollama_analysis and ollama_analysis.get("overall_score") is not None:
+            # Use Ollama's comprehensive analysis
+            scores = {
+                "overall_score": ollama_analysis.get("overall_score", base_scores["overall_score"]),
+                "confidence_level": ollama_analysis.get("confidence_level", base_scores["confidence_level"]),
+                "skill_match_score": ollama_analysis.get("dimension_scores", {}).get("skill_match", base_scores["skill_match_score"]),
+                "experience_score": ollama_analysis.get("dimension_scores", {}).get("experience_alignment", base_scores["experience_score"]),
+                "project_similarity_score": ollama_analysis.get("dimension_scores", {}).get("project_similarity", base_scores["project_similarity_score"]),
+                "domain_familiarity_score": ollama_analysis.get("dimension_scores", {}).get("domain_culture_fit", base_scores["domain_familiarity_score"]),
+            }
+            # Store Ollama analysis for explanation
+            ollama_analysis_data = ollama_analysis
+        else:
+            # Fallback to base scores
+            scores = base_scores
+            ollama_analysis_data = None
+        
+        # Step 4: Generate AI explanation (use Ollama analysis if available)
+        if ollama_analysis_data:
+            # Use Ollama's detailed analysis for explanation
+            explanation_data = {
+                "summary": ollama_analysis_data.get("reasoning", ""),
+                "strengths": ollama_analysis_data.get("strengths", []),
+                "weaknesses": ollama_analysis_data.get("weaknesses", []),
+                "recommendations": ollama_analysis_data.get("recommendations", []),
+                "confidence_score": scores["overall_score"] / 100.0,
+                "reasoning_quality": ollama_analysis_data.get("confidence_level", "medium"),
+            }
+        else:
+            # Fallback to standard AI explanation
+            explanation_data = ai_engine.generate_explanation(candidate_data, job_data, scores)
         
         # Create or update match result
         match_result = (
@@ -141,6 +189,14 @@ class MatchingService:
             ai_explanation.recommendations = explanation_data.get("recommendations", [])
             ai_explanation.confidence_score = explanation_data.get("confidence_score", 0)
             ai_explanation.reasoning_quality = explanation_data.get("reasoning_quality", "medium")
+            # Store detailed Ollama analysis if available
+            if ollama_analysis_data and ollama_analysis_data.get("detailed_analysis"):
+                ai_explanation.skill_analysis = ollama_analysis_data.get("detailed_analysis", {}).get("skill_analysis", {})
+                ai_explanation.experience_analysis = ollama_analysis_data.get("detailed_analysis", {}).get("experience_analysis", {})
+                ai_explanation.gap_analysis = {
+                    "missing_skills": ollama_analysis_data.get("detailed_analysis", {}).get("skill_analysis", {}).get("missing_critical_skills", []),
+                    "weaknesses": ollama_analysis_data.get("weaknesses", [])
+                }
         else:
             ai_explanation = AIExplanation(
                 match_result_id=match_result.id,
@@ -150,8 +206,16 @@ class MatchingService:
                 recommendations=explanation_data.get("recommendations", []),
                 confidence_score=explanation_data.get("confidence_score", 0),
                 reasoning_quality=explanation_data.get("reasoning_quality", "medium"),
-                model_used=settings.HUGGINGFACE_LLM_MODEL if ai_engine.provider == "huggingface" else (settings.OPENAI_MODEL if ai_engine.provider == "openai" else "fallback"),
+                model_used="ollama-qwen2.5" if ollama_analysis_data else (settings.HUGGINGFACE_LLM_MODEL if ai_engine.provider == "huggingface" else (settings.OPENAI_MODEL if ai_engine.provider == "openai" else "fallback")),
             )
+            # Store detailed Ollama analysis if available
+            if ollama_analysis_data and ollama_analysis_data.get("detailed_analysis"):
+                ai_explanation.skill_analysis = ollama_analysis_data.get("detailed_analysis", {}).get("skill_analysis", {})
+                ai_explanation.experience_analysis = ollama_analysis_data.get("detailed_analysis", {}).get("experience_analysis", {})
+                ai_explanation.gap_analysis = {
+                    "missing_skills": ollama_analysis_data.get("detailed_analysis", {}).get("skill_analysis", {}).get("missing_critical_skills", []),
+                    "weaknesses": ollama_analysis_data.get("weaknesses", [])
+                }
             db.add(ai_explanation)
         
         db.commit()

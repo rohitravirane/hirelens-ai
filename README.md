@@ -18,8 +18,11 @@ HireLens AI is not a demo or tutorial project. It's a **real-world, enterprise-g
 - ✅ **Experience Calculation**: Accurate years of experience calculation from resume date ranges with overlap handling
 - ✅ **Job Description Intelligence**: Parse and understand job requirements with comprehensive descriptions
 - ✅ **Semantic Matching**: AI-powered candidate-job matching with embeddings
+- ✅ **World-Class Ollama-Based Ranking**: Deep, comprehensive candidate-job matching using Ollama LLM with multi-dimensional analysis
+- ✅ **Smart Skill Matching**: Case-insensitive, alias-aware, fuzzy matching with transferable skills detection
 - ✅ **Multi-Dimensional Scoring**: Skill match, experience, projects, domain familiarity
 - ✅ **Explainable AI**: Human-readable explanations for every match with strengths, weaknesses, and recommendations
+- ✅ **Elite Seniority Detection**: Comprehensive resume-based seniority analysis (never returns unknown) with red flag detection
 - ✅ **Candidate Ranking**: Percentile-based ranking with confidence levels
 - ✅ **Recruiter Dashboard**: Interactive UI with tabs, modals, drag-drop, and real-time notifications
 - ✅ **Job Management**: Create and manage tech jobs with AI-powered parsing
@@ -41,8 +44,13 @@ Frontend (Next.js) → API Gateway (FastAPI) → Services → Database (PostgreS
                                                     Celery Workers (Async Tasks)
                                                           ↓
                                     Candidate Kundali Engine (Qwen Text-Only via Ollama)
+                                    ├── Elite Seniority Analyzer (Ollama-based, red flag detection)
+                                    └── Fallback: Legacy AI Parser (LayoutLM + NER + HURIDOCS)
                                                           ↓
-                                    Fallback: Legacy AI Parser (LayoutLM + NER + HURIDOCS)
+                                    Matching & Ranking Engine
+                                    ├── Ollama Ranking Engine (World-class deep matching)
+                                    ├── Smart Skill Matching (Case-insensitive, aliases, fuzzy)
+                                    └── Multi-Dimensional Scoring
                                                           ↓
                                     Optional Services: HURIDOCS Layout Analysis (port 5060)
 ```
@@ -151,7 +159,12 @@ The recruiter dashboard includes:
   - Black text in all form inputs for better readability
   - Immediate logout redirect to login page
   - Loading states and visual feedback
-  - Fully responsive design (mobile, tablet, desktop)
+  - **Fully Responsive Design**: World-class mobile-first responsive design
+    - Mobile (320px+): Optimized layouts, touch-friendly buttons, stacked cards
+    - Tablet (768px+): 2-column grids, improved spacing
+    - Desktop (1024px+): Full table views, multi-column layouts
+    - All modals, forms, and tables adapt seamlessly to screen size
+    - Breakpoints: sm (640px), md (768px), lg (1024px), xl (1280px)
 
 ### Default Credentials
 
@@ -181,7 +194,13 @@ hirelens-ai/
 │   │   ├── jobs/           # Job description intelligence
 │   │   ├── candidates/     # Candidate management
 │   │   ├── matching/       # Matching & scoring engine
+│   │   │   ├── ollama_ranking.py  # World-class Ollama-based ranking system
+│   │   │   ├── scoring.py  # Smart skill matching & scoring
+│   │   │   ├── service.py  # Matching orchestration
+│   │   │   └── router.py  # Matching API endpoints
 │   │   ├── ai_engine/      # AI reasoning engine
+│   │   ├── resumes/
+│   │   │   ├── seniority_analyzer.py  # Elite seniority detection with red flags
 │   │   ├── core/           # Core utilities
 │   │   ├── models/         # Database models
 │   │   │   ├── candidate.py
@@ -283,7 +302,22 @@ The system uses a **simplified, intelligent architecture** that prioritizes unde
 6. **Candidate Kundali Generation**:
    - **Structured Data**: Identity, experience, education, projects, skills
    - **Personality Profile**: Work style, ownership, learning, communication, risk profile
-   - **Seniority Assessment**: Evidence-based (years, roles, responsibilities)
+   - **Elite Seniority Assessment**: World-class comprehensive analysis based on entire resume
+  - **Never Returns Unknown**: Always determines a level intelligently
+  - **Multi-Dimensional Analysis**: Years, titles, responsibilities, technical depth, leadership
+  - **Red Flag Detection**: Brutally honest assessment of issues:
+    - Job hopping (frequent job changes)
+    - Title inflation (senior title but junior responsibilities)
+    - Experience mismatch (years don't match claimed seniority)
+    - Gap issues (long unexplained gaps)
+    - Skill inconsistency (skills don't match experience level)
+    - Overstatement (claims don't match evidence)
+    - Career regression (moving to lower-level roles)
+    - No progression (same level for 5+ years)
+    - Weak evidence (vague descriptions, no metrics)
+    - Education mismatch
+  - **Evidence-Based**: All assessments backed by resume evidence
+  - **Positive Signals**: Identifies career progression, leadership, technical depth
    - **Quality Scoring**: Based on data completeness and clarity
 7. **Post-Processing & Validation**:
    - **Skills Cleaning**: Automatically removes company names from skills arrays (e.g., "Team 4 Progress Technologies" removed from tools/skills)
@@ -347,11 +381,17 @@ curl -X POST http://localhost:8000/api/v1/resumes/upload \
 ### 2. Job Description Intelligence
 
 Create job descriptions and extract:
-- Required skills
+- Required skills (with smart extraction for full-stack roles)
 - Nice-to-have skills
 - Experience requirements
 - Seniority level
 - Education requirements
+
+**Smart Skill Extraction:**
+- Automatically extracts REST API for full-stack roles
+- Includes HTML/CSS for frontend roles
+- Comprehensive skill keyword detection
+- Context-aware extraction (required vs nice-to-have)
 
 **API Example:**
 ```bash
@@ -365,14 +405,63 @@ curl -X POST http://localhost:8000/api/v1/jobs/ \
   }'
 ```
 
-### 3. AI Matching & Scoring
+### 3. World-Class AI Matching & Scoring
 
-Match candidates to jobs with:
-- **Overall Score** (0-100)
-- **Skill Match Score** (40% weight)
-- **Experience Score** (25% weight)
-- **Project Similarity** (20% weight)
-- **Domain Familiarity** (15% weight)
+**Ollama-Based Deep Ranking System:**
+
+The platform uses a **world-class Ollama-based ranking engine** that performs comprehensive, multi-dimensional analysis of candidate-job matches:
+
+**Pipeline Flow:**
+1. **Base Rule-Based Scoring**: Initial scores using rule-based engine (skills, experience, projects, domain)
+2. **Ollama Deep Analysis**: Comprehensive analysis using Qwen2.5-7B-Instruct via Ollama
+   - Deep semantic analysis of entire candidate and job profiles
+   - Multi-dimensional scoring with detailed breakdowns
+   - Consistent, structured output format
+   - World-class matching accuracy
+3. **Final Scores**: Uses Ollama analysis scores (fallback to base scores if Ollama unavailable)
+
+**Scoring Dimensions:**
+- **Skill Match** (40% weight): 
+  - Smart matching with case-insensitive, alias-aware detection
+  - Transferable skills (e.g., React → Vue, Java → Spring)
+  - Skill depth and proficiency assessment
+  - Missing critical skills analysis
+  - Nice-to-have skills bonus
+- **Experience Alignment** (25% weight):
+  - Years of experience vs required
+  - Relevant industry experience
+  - Role similarity and career progression
+  - Experience quality over quantity
+- **Project Similarity** (20% weight):
+  - Project complexity and scale alignment
+  - Technology stack alignment
+  - Domain/industry relevance
+  - Problem-solving approaches
+  - Impact and achievements
+- **Domain & Culture Fit** (15% weight):
+  - Industry/domain knowledge
+  - Team collaboration experience
+  - Communication skills
+  - Adaptability and learning ability
+  - Cultural alignment indicators
+
+**Output Structure:**
+- Overall score (0-100) with confidence level
+- Dimension scores (skill, experience, project, culture)
+- Detailed analysis (matched skills, missing skills, transferable skills)
+- Strengths (top 3-5 with explanations)
+- Weaknesses/Gaps (top 3-5 with explanations)
+- Recommendations (actionable items)
+- Hiring recommendation (Strong Match / Good Match / Moderate Match / Weak Match)
+
+**Smart Skill Matching Features:**
+- ✅ **Case-Insensitive**: "JavaScript" matches "javascript", "JAVASCRIPT"
+- ✅ **Alias Detection**: "JS" matches "JavaScript", "React.js" matches "React"
+- ✅ **Fuzzy Matching**: Handles variations and typos
+- ✅ **Transferable Skills**: Recognizes related technologies (e.g., Spring → Java)
+- ✅ **Plural/Singular**: "Rest APIs" matches "rest api"
+- ✅ **Compound Skills**: Handles multi-word skills intelligently
+- ✅ **False Positive Prevention**: Prevents "java" matching "javascript"
 
 **API Example:**
 ```bash
@@ -790,6 +879,9 @@ docker-compose exec backend python scripts/update_quality_scores.py
 
 ### Phase 1 (Current)
 - ✅ Core matching engine
+- ✅ World-class Ollama-based ranking system (deep matching)
+- ✅ Smart skill matching (case-insensitive, aliases, fuzzy)
+- ✅ Elite seniority detection (never unknown, red flag detection)
 - ✅ Explainable AI
 - ✅ Qwen text-based resume parsing (PRIMARY) - text extraction first, then Qwen text-only model
 - ✅ LayoutLMv3 support (fallback)
@@ -798,7 +890,7 @@ docker-compose exec backend python scripts/update_quality_scores.py
 - ✅ World-class AI-powered resume parsing with quality scoring
 - ✅ Quality indicators and reprocessing system
 - ✅ Interactive recruiter dashboard with tabs
-- ✅ Job creation with AI parsing
+- ✅ Job creation with AI parsing (enhanced skill extraction)
 - ✅ Resume upload with drag-and-drop
 - ✅ Candidate management with quality indicators and auto-fill
 - ✅ AI-powered rankings with explanations
@@ -853,7 +945,51 @@ Built with:
 
 ## 📝 Recent Updates
 
-### Latest Features (v2.0 - Qwen Text-Based Architecture)
+### Latest Features (v2.1 - World-Class Ranking & Elite Seniority)
+
+**World-Class Ollama-Based Ranking System:**
+- ✨ **Deep Candidate-Job Matching**: Comprehensive analysis using Ollama Qwen2.5-7B-Instruct
+  - Multi-dimensional scoring (skills, experience, projects, domain, culture)
+  - Detailed analysis with matched skills, missing skills, transferable skills
+  - Strengths, weaknesses, and recommendations with explanations
+  - Hiring recommendations (Strong Match / Good Match / Moderate Match / Weak Match)
+  - Consistent, structured output format
+  - World-class matching accuracy
+- ✨ **Smart Skill Matching**: Advanced skill detection system
+  - Case-insensitive matching ("JavaScript" = "javascript" = "JAVASCRIPT")
+  - Alias detection ("JS" = "JavaScript", "React.js" = "React")
+  - Fuzzy matching for variations and typos
+  - Transferable skills recognition (Spring → Java, React → Vue)
+  - Plural/singular handling ("Rest APIs" = "rest api")
+  - False positive prevention (prevents "java" matching "javascript")
+- ✨ **Enhanced Job Parser**: Improved skill extraction
+  - Automatic REST API extraction for full-stack roles
+  - HTML/CSS inclusion for frontend roles
+  - Context-aware skill detection
+
+**Elite Seniority Detection System:**
+- ✨ **Comprehensive Resume Analysis**: Analyzes entire resume, not just title
+  - Never returns "unknown" - always determines level intelligently
+  - Multi-dimensional analysis (years, titles, responsibilities, technical depth)
+  - Evidence-based reasoning with confidence scores
+- ✨ **Brutal Red Flag Detection**: Honest assessment of issues
+  - Job hopping detection (frequent job changes)
+  - Title inflation (senior title but junior responsibilities)
+  - Experience mismatch (years don't match claimed seniority)
+  - Gap issues (long unexplained gaps)
+  - Skill inconsistency (skills don't match experience level)
+  - Overstatement (claims don't match evidence)
+  - Career regression (moving to lower-level roles)
+  - No progression (same level for 5+ years)
+  - Weak evidence (vague descriptions, no metrics)
+  - Education mismatch
+- ✨ **Positive Signal Detection**: Identifies strengths
+  - Career progression indicators
+  - Leadership evidence
+  - Technical depth indicators
+  - Measurable impact and achievements
+
+### Previous Features (v2.0 - Qwen Text-Based Architecture)
 
 **Resume Extraction Improvements:**
 - ✨ **Qwen Text-Based Parsing**: Intelligent resume parsing using Qwen2.5-7B-Instruct text-only model via Ollama

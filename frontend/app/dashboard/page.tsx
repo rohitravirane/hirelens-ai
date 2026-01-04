@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import api from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<'jobs' | 'candidates' | 'rankings'>('jobs')
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [matchingCandidateId, setMatchingCandidateId] = useState<number | null>(null)
+  const [highlightCandidateId, setHighlightCandidateId] = useState<number | null>(null)
 
   const { data: jobs, isLoading: jobsLoading } = useQuery(
     'jobs',
@@ -79,13 +80,26 @@ export default function DashboardPage() {
     { enabled: !!selectedJobId }
   )
 
+  // Scroll to highlighted candidate in rankings
+  useEffect(() => {
+    if (highlightCandidateId && activeTab === 'rankings' && rankings) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        const element = document.getElementById(`candidate-${highlightCandidateId}`)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 500)
+    }
+  }, [highlightCandidateId, activeTab, rankings])
+
   const matchMutation = useMutation(
     async ({ candidateId, jobId }: { candidateId: number; jobId: number }) => {
       setMatchingCandidateId(candidateId)
       return api.post(`/api/v1/matching/match?candidate_id=${candidateId}&job_id=${jobId}`)
     },
     {
-      onSuccess: (data) => {
+      onSuccess: (data: any) => {
         queryClient.invalidateQueries(['rankings', selectedJobId])
         queryClient.invalidateQueries('candidates')
         setMatchingCandidateId(null)
@@ -103,6 +117,50 @@ export default function DashboardPage() {
         setNotification({ 
           type: 'error', 
           message: error.response?.data?.detail || 'Failed to match candidate. Please try again.' 
+        })
+        setTimeout(() => setNotification(null), 5000)
+      },
+    }
+  )
+
+  const findBestMatchMutation = useMutation(
+    async (candidateId: number) => {
+      setMatchingCandidateId(candidateId)
+      return api.post(`/api/v1/matching/candidate/${candidateId}/find-best-match`)
+    },
+    {
+      onSuccess: (data: any) => {
+        const bestJobId = data.data?.job_description_id
+        if (bestJobId) {
+          setSelectedJobId(bestJobId)
+          setHighlightCandidateId(data.data?.candidate_id || null)
+          queryClient.invalidateQueries(['rankings', bestJobId])
+          queryClient.invalidateQueries('candidates')
+          setMatchingCandidateId(null)
+          setNotification({ 
+            type: 'success', 
+            message: `Found best match! Score: ${data.data?.overall_score?.toFixed(1) || 'N/A'}%` 
+          })
+          // Auto switch to rankings tab
+          setActiveTab('rankings')
+          // Clear notification after 3 seconds
+          setTimeout(() => setNotification(null), 3000)
+          // Clear highlight after 5 seconds
+          setTimeout(() => setHighlightCandidateId(null), 5000)
+        } else {
+          setMatchingCandidateId(null)
+          setNotification({ 
+            type: 'error', 
+            message: 'Failed to find best match. Please try again.' 
+          })
+          setTimeout(() => setNotification(null), 5000)
+        }
+      },
+      onError: (error: any) => {
+        setMatchingCandidateId(null)
+        setNotification({ 
+          type: 'error', 
+          message: error.response?.data?.detail || 'Failed to find best match. Please try again.' 
         })
         setTimeout(() => setNotification(null), 5000)
       },
@@ -148,6 +206,77 @@ export default function DashboardPage() {
     setTimeout(() => setNotification(null), 5000)
   }
 
+  // Memoize job description card
+  const jobDescriptionCard = useMemo(() => {
+    if (!selectedJobId || !jobs) return null;
+    const selectedJob = jobs.find((job: any) => job.id === selectedJobId);
+    if (!selectedJob) return null;
+    return (
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-lg border border-blue-200 p-4 sm:p-6 mb-6">
+        <div className="flex flex-col sm:flex-row items-start justify-between mb-4 gap-3">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 break-words">{selectedJob.title}</h3>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-3">
+              <span className="flex items-center">
+                <svg className="w-4 h-4 mr-1.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                {selectedJob.company}
+              </span>
+              {selectedJob.location && (
+                <span className="flex items-center">
+                  <svg className="w-4 h-4 mr-1.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  {selectedJob.location}
+                </span>
+              )}
+              {selectedJob.department && (
+                <span className="flex items-center">
+                  <svg className="w-4 h-4 mr-1.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                  {selectedJob.department}
+                </span>
+              )}
+              {selectedJob.seniority_level && (
+                <span className="px-2.5 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
+                  {selectedJob.seniority_level}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        {selectedJob.required_skills && selectedJob.required_skills.length > 0 && (
+          <div className="mb-4">
+            <span className="text-xs sm:text-sm font-semibold text-gray-700 block mb-2">Required Skills:</span>
+            <div className="flex flex-wrap gap-1.5 sm:gap-2">
+              {selectedJob.required_skills.slice(0, 12).map((skill: string, index: number) => (
+                <span key={index} className="px-2 sm:px-3 py-0.5 sm:py-1 bg-blue-600 text-white text-xs font-medium rounded-full shadow-sm break-words">
+                  {skill}
+                </span>
+              ))}
+              {selectedJob.required_skills.length > 12 && (
+                <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-gray-200 text-gray-700 text-xs font-medium rounded-full">
+                  +{selectedJob.required_skills.length - 12} more
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+        {selectedJob.experience_years_required && (
+          <div className="flex items-center text-xs sm:text-sm text-gray-600 flex-wrap gap-1">
+            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="font-medium">Experience Required:</span>
+            <span className="ml-1">{selectedJob.experience_years_required} years</span>
+          </div>
+        )}
+      </div>
+    );
+  }, [selectedJobId, jobs])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -457,43 +586,45 @@ export default function DashboardPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                               </svg>
                             </button>
-                            {selectedJobId && (
-                              <button
-                                onClick={() => {
-                                  // Block matching if quality is too low
-                                  if (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80) {
-                                    setNotification({
-                                      type: 'error',
-                                      message: `Cannot match: Resume quality is ${candidate.resume_quality_score}%. Please reprocess resume to improve quality (minimum 80% required).`
-                                    })
-                                    setTimeout(() => setNotification(null), 5000)
-                                    return
-                                  }
-                                  matchMutation.mutate({ candidateId: candidate.id, jobId: selectedJobId })
-                                }}
-                                disabled={matchMutation.isLoading || matchingCandidateId === candidate.id || (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80)}
-                                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                                  matchMutation.isLoading && matchingCandidateId === candidate.id
-                                    ? 'bg-primary-100 text-primary-700 cursor-wait'
-                                    : (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80)
-                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                    : 'bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed'
-                                }`}
-                                title={candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80 ? 'Resume quality too low. Reprocess required.' : ''}
-                              >
-                                {matchMutation.isLoading && matchingCandidateId === candidate.id ? (
-                                  <span className="flex items-center">
-                                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647A7.962 7.962 0 0112 20c4.418 0 8-3.582 8-8h-4a4 4 0 11-8 0v4z"></path>
-                                    </svg>
-                                    Matching...
-                                  </span>
-                                ) : (
-                                  'Match'
-                                )}
-                              </button>
-                            )}
+                            <button
+                              onClick={() => {
+                                // Block matching if quality is too low
+                                if (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80) {
+                                  setNotification({
+                                    type: 'error',
+                                    message: `Cannot match: Resume quality is ${candidate.resume_quality_score}%. Please reprocess resume to improve quality (minimum 80% required).`
+                                  })
+                                  setTimeout(() => setNotification(null), 5000)
+                                  return
+                                }
+                                // Always find best match across all jobs
+                                findBestMatchMutation.mutate(candidate.id)
+                              }}
+                              disabled={
+                                (findBestMatchMutation.isLoading && matchingCandidateId === candidate.id) ||
+                                (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80)
+                              }
+                              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                                findBestMatchMutation.isLoading && matchingCandidateId === candidate.id
+                                  ? 'bg-primary-100 text-primary-700 cursor-wait'
+                                  : (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80)
+                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                  : 'bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                              }`}
+                              title={candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80 ? 'Resume quality too low. Reprocess required.' : 'Find best matching job'}
+                            >
+                              {findBestMatchMutation.isLoading && matchingCandidateId === candidate.id ? (
+                                <span className="flex items-center">
+                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647A7.962 7.962 0 0112 20c4.418 0 8-3.582 8-8h-4a4 4 0 11-8 0v4z"></path>
+                                  </svg>
+                                  Finding best match...
+                                </span>
+                              ) : (
+                                'Find Best Match'
+                              )}
+                            </button>
                           </div>
                         </td>
                         </tr>
@@ -556,43 +687,45 @@ export default function DashboardPage() {
                           </svg>
                           Details
                         </button>
-                        {selectedJobId && (
-                          <button
-                            onClick={() => {
-                              // Block matching if quality is too low
-                              if (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80) {
-                                setNotification({
-                                  type: 'error',
-                                  message: `Cannot match: Resume quality is ${candidate.resume_quality_score}%. Please reprocess resume to improve quality (minimum 80% required).`
-                                })
-                                setTimeout(() => setNotification(null), 5000)
-                                return
-                              }
-                              matchMutation.mutate({ candidateId: candidate.id, jobId: selectedJobId })
-                            }}
-                            disabled={matchMutation.isLoading || matchingCandidateId === candidate.id || (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80)}
-                            className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                              matchMutation.isLoading && matchingCandidateId === candidate.id
-                                ? 'bg-primary-100 text-primary-700 cursor-wait'
-                                : (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80)
-                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                : 'bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed'
-                            }`}
-                            title={candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80 ? 'Resume quality too low. Reprocess required.' : ''}
-                          >
-                            {matchMutation.isLoading && matchingCandidateId === candidate.id ? (
-                              <span className="flex items-center justify-center">
-                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647A7.962 7.962 0 0112 20c4.418 0 8-3.582 8-8h-4a4 4 0 11-8 0v4z"></path>
-                                </svg>
-                                Matching...
-                              </span>
-                            ) : (
-                              'Match'
-                            )}
-                          </button>
-                        )}
+                        <button
+                          onClick={() => {
+                            // Block matching if quality is too low
+                            if (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80) {
+                              setNotification({
+                                type: 'error',
+                                message: `Cannot match: Resume quality is ${candidate.resume_quality_score}%. Please reprocess resume to improve quality (minimum 80% required).`
+                              })
+                              setTimeout(() => setNotification(null), 5000)
+                              return
+                            }
+                            // Always find best match across all jobs
+                            findBestMatchMutation.mutate(candidate.id)
+                          }}
+                          disabled={
+                            (findBestMatchMutation.isLoading && matchingCandidateId === candidate.id) ||
+                            (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80)
+                          }
+                          className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                            findBestMatchMutation.isLoading && matchingCandidateId === candidate.id
+                              ? 'bg-primary-100 text-primary-700 cursor-wait'
+                              : (candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80)
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                          }`}
+                          title={candidate.resume_quality_score !== null && candidate.resume_quality_score !== undefined && candidate.resume_quality_score < 80 ? 'Resume quality too low. Reprocess required.' : 'Find best matching job'}
+                        >
+                          {findBestMatchMutation.isLoading && matchingCandidateId === candidate.id ? (
+                            <span className="flex items-center justify-center">
+                              <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647A7.962 7.962 0 0112 20c4.418 0 8-3.582 8-8h-4a4 4 0 11-8 0v4z"></path>
+                              </svg>
+                              Finding best match...
+                            </span>
+                          ) : (
+                            'Find Best Match'
+                          )}
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -658,6 +791,9 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Job Description Card */}
+            {jobDescriptionCard}
+
             {!selectedJobId ? (
               <div className="bg-white rounded-lg shadow p-12 text-center">
                 <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -667,49 +803,76 @@ export default function DashboardPage() {
                 <p className="mt-2 text-sm text-gray-500">Choose a job from the dropdown above to see candidate rankings</p>
               </div>
             ) : rankingsLoading ? (
-              <div className="text-center py-12">
+              <div className="text-center py-16">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-                <p className="mt-4 text-gray-500">Loading rankings...</p>
+                <p className="mt-4 text-gray-500 font-medium">Loading rankings...</p>
               </div>
-            ) : rankings && rankings.length > 0 ? (
-              <div className="bg-white rounded-lg shadow divide-y">
+            ) : (rankings && rankings.length > 0) ? (
+              <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Ranked Candidates ({rankings.length})
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">Candidates ranked by match score</p>
+                </div>
+                <div className="divide-y divide-gray-100">
                 {rankings.map((ranking: any, index: number) => (
-                  <div key={ranking.candidate_id} className="p-6 hover:bg-gray-50 transition-colors">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center space-x-4">
+                  <div 
+                    key={ranking.candidate_id} 
+                    id={`candidate-${ranking.candidate_id}`}
+                    className={`p-6 hover:bg-gray-50 transition-colors ${
+                      highlightCandidateId === ranking.candidate_id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-5">
+                      <div className="flex items-start space-x-3 sm:space-x-4 flex-1 min-w-0">
                         <div className="flex-shrink-0">
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold ${
-                            index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                            index === 1 ? 'bg-gray-100 text-gray-800' :
-                            index === 2 ? 'bg-orange-100 text-orange-800' :
-                            'bg-blue-100 text-blue-800'
+                          <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-lg sm:text-xl font-bold shadow-md ${
+                            index === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-white ring-2 ring-yellow-300' :
+                            index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-500 text-white ring-2 ring-gray-200' :
+                            index === 2 ? 'bg-gradient-to-br from-orange-400 to-orange-600 text-white ring-2 ring-orange-300' :
+                            'bg-gradient-to-br from-blue-400 to-blue-600 text-white ring-2 ring-blue-200'
                           }`}>
                             #{index + 1}
                           </div>
                         </div>
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-900">
-                            {ranking.candidate_name || 'Unknown Candidate'}
-                          </h3>
-                          <p className="text-sm text-gray-500">{ranking.candidate_email}</p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-1">
+                            <h3 className="text-lg sm:text-xl font-bold text-gray-900 break-words">
+                              {ranking.candidate_name || 'Unknown Candidate'}
+                            </h3>
+                            {index === 0 && (
+                              <span className="flex-shrink-0 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full">
+                                Top Match
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 flex items-center">
+                            <svg className="w-4 h-4 mr-1.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            {ranking.candidate_email}
+                          </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-3xl font-bold text-primary-600">
-                          {ranking.match_result.overall_score.toFixed(1)}
+                      <div className="flex-shrink-0 text-left sm:text-right w-full sm:w-auto">
+                        <div className="inline-flex flex-col items-start sm:items-end bg-gradient-to-br from-primary-500 to-primary-700 text-white px-4 sm:px-5 py-2 sm:py-3 rounded-xl shadow-lg">
+                          <div className="text-3xl sm:text-4xl font-bold">
+                            {ranking.match_result.overall_score.toFixed(1)}
+                          </div>
+                          <div className="text-xs font-medium text-primary-100 uppercase tracking-wide mt-1">Match Score</div>
                         </div>
-                        <div className="text-sm text-gray-500">Match Score</div>
-                        <div className="mt-2">
+                        <div className="mt-3 flex justify-end">
                           <span
-                            className={`px-2 py-1 rounded text-xs font-medium ${
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm ${
                               ranking.match_result.confidence_level === 'high'
-                                ? 'bg-green-100 text-green-800'
+                                ? 'bg-green-100 text-green-800 border border-green-200'
                                 : ranking.match_result.confidence_level === 'medium'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-red-100 text-red-800'
+                                ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                                : 'bg-red-100 text-red-800 border border-red-200'
                             }`}
                           >
-                            {ranking.match_result.confidence_level?.toUpperCase() || 'MEDIUM'}
+                            {ranking.match_result.confidence_level?.toUpperCase() || 'MEDIUM'} Confidence
                           </span>
                         </div>
                       </div>
@@ -724,26 +887,105 @@ export default function DashboardPage() {
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           {ranking.match_result.ai_explanation.strengths && ranking.match_result.ai_explanation.strengths.length > 0 && (
-                            <div>
-                              <span className="text-xs font-semibold text-green-700">Strengths:</span>
-                              <ul className="list-disc list-inside text-xs text-gray-600 mt-1 space-y-1">
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span className="text-sm font-bold text-green-800">Strengths</span>
+                              </div>
+                              <ul className="space-y-2">
                                 {ranking.match_result.ai_explanation.strengths.slice(0, 3).map((strength: string, i: number) => (
-                                  <li key={i}>{strength}</li>
+                                  <li key={i} className="text-sm text-green-900 flex items-start">
+                                    <span className="text-green-500 mr-2 mt-1">•</span>
+                                    <span>{strength}</span>
+                                  </li>
                                 ))}
                               </ul>
                             </div>
                           )}
                           {ranking.match_result.ai_explanation.weaknesses && ranking.match_result.ai_explanation.weaknesses.length > 0 && (
-                            <div>
-                              <span className="text-xs font-semibold text-red-700">Gaps:</span>
-                              <ul className="list-disc list-inside text-xs text-gray-600 mt-1 space-y-1">
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <span className="text-sm font-bold text-red-800">Gaps</span>
+                              </div>
+                              <ul className="space-y-2">
                                 {ranking.match_result.ai_explanation.weaknesses.slice(0, 3).map((weakness: string, i: number) => (
-                                  <li key={i}>{weakness}</li>
+                                  <li key={i} className="text-sm text-red-900 flex items-start">
+                                    <span className="text-red-500 mr-2 mt-1">•</span>
+                                    <span>{weakness}</span>
+                                  </li>
                                 ))}
                               </ul>
                             </div>
                           )}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Kundali Data */}
+                    {ranking.kundali && (
+                      <div className="mt-4 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                        <h4 className="font-semibold text-sm text-indigo-900 mb-3">Kundali Profile</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                          {ranking.kundali.total_experience_years !== null && ranking.kundali.total_experience_years !== undefined && (
+                            <div>
+                              <span className="text-xs font-semibold text-indigo-700">Total Experience:</span>
+                              <span className="ml-2 text-sm text-gray-700">{ranking.kundali.total_experience_years} years</span>
+                            </div>
+                          )}
+                          {ranking.kundali.seniority_level && (
+                            <div>
+                              <span className="text-xs font-semibold text-indigo-700">Seniority:</span>
+                              <span className="ml-2 text-sm text-gray-700 capitalize">{ranking.kundali.seniority_level}</span>
+                            </div>
+                          )}
+                          {ranking.kundali.overall_confidence_score !== null && ranking.kundali.overall_confidence_score !== undefined && (
+                            <div>
+                              <span className="text-xs font-semibold text-indigo-700">Confidence:</span>
+                              <span className="ml-2 text-sm text-gray-700">{(ranking.kundali.overall_confidence_score * 100).toFixed(0)}%</span>
+                            </div>
+                          )}
+                        </div>
+                        {ranking.kundali.summary && (
+                          <div className="mb-4">
+                            <span className="text-xs font-semibold text-indigo-700 block mb-1">Summary:</span>
+                            <p className="text-sm text-gray-700">{ranking.kundali.summary}</p>
+                          </div>
+                        )}
+                        {(ranking.kundali.skills_frontend && ranking.kundali.skills_frontend.length > 0) ||
+                         (ranking.kundali.skills_backend && ranking.kundali.skills_backend.length > 0) ||
+                         (ranking.kundali.skills_devops && ranking.kundali.skills_devops.length > 0) ||
+                         (ranking.kundali.skills_ai_ml && ranking.kundali.skills_ai_ml.length > 0) ||
+                         (ranking.kundali.skills_tools && ranking.kundali.skills_tools.length > 0) ||
+                         (ranking.kundali.skills_soft && ranking.kundali.skills_soft.length > 0) ? (
+                          <div>
+                            <span className="text-xs font-semibold text-indigo-700 block mb-2">Skills:</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {ranking.kundali.skills_frontend && ranking.kundali.skills_frontend.slice(0, 5).map((skill: string, i: number) => (
+                                <span key={`fe-${i}`} className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">{skill}</span>
+                              ))}
+                              {ranking.kundali.skills_backend && ranking.kundali.skills_backend.slice(0, 5).map((skill: string, i: number) => (
+                                <span key={`be-${i}`} className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded">{skill}</span>
+                              ))}
+                              {ranking.kundali.skills_devops && ranking.kundali.skills_devops.slice(0, 5).map((skill: string, i: number) => (
+                                <span key={`devops-${i}`} className="px-2 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">{skill}</span>
+                              ))}
+                              {ranking.kundali.skills_ai_ml && ranking.kundali.skills_ai_ml.slice(0, 5).map((skill: string, i: number) => (
+                                <span key={`aiml-${i}`} className="px-2 py-0.5 text-xs bg-pink-100 text-pink-800 rounded">{skill}</span>
+                              ))}
+                              {ranking.kundali.skills_tools && ranking.kundali.skills_tools.slice(0, 5).map((skill: string, i: number) => (
+                                <span key={`tools-${i}`} className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded">{skill}</span>
+                              ))}
+                              {ranking.kundali.skills_soft && ranking.kundali.skills_soft.slice(0, 5).map((skill: string, i: number) => (
+                                <span key={`soft-${i}`} className="px-2 py-0.5 text-xs bg-gray-100 text-gray-800 rounded">{skill}</span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     )}
 
@@ -776,6 +1018,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ))}
+                </div>
               </div>
             ) : (
               <div className="bg-white rounded-lg shadow p-12 text-center">

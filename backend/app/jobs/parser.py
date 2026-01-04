@@ -84,6 +84,17 @@ class JobDescriptionParser:
                 if skill not in found_skills:
                     found_skills.append(skill)
         
+        # For full-stack roles, also include common implicit skills
+        if 'full stack' in text_lower or 'fullstack' in text_lower or 'full-stack' in text_lower:
+            # HTML and CSS are fundamental for frontend
+            if 'html' not in found_skills and 'html' in text_lower:
+                found_skills.append('html')
+            if 'css' not in found_skills and 'css' in text_lower:
+                found_skills.append('css')
+            # REST API is common for full-stack
+            if 'rest api' not in found_skills and ('rest' in text_lower or 'api' in text_lower):
+                found_skills.append('rest api')
+        
         return list(set(found_skills))
     
     def _extract_nice_to_have_skills(self, text: str) -> List[str]:
